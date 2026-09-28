@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="README.md" />
+    <File Path="docs/DECISOES.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="CadeAEscalacao.Application/CadeAEscalacao.Application.csproj" />
+    <Project Path="cadeaescalacao.client/cadeaescalacao.client.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <Project Path="CadeAEscalacao.Domain/CadeAEscalacao.Domain.csproj" />
+    <Project Path="CadeAEscalacao.Infrastructure/CadeAEscalacao.Infrastructure.csproj" />
+    <Project Path="CadeAEscalacao.Server/CadeAEscalacao.Server.csproj" />
+  </Folder>
+</Solution>
