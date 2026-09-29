@@ -162,16 +162,57 @@ Toda semana, no grupo do WhatsApp, alguém pergunta: *"Professor Fulano, cadê a
 
 **Decisão**
 - Repositório no GitHub: `cade-a-escalacao`.
-- **`main` sempre funcionando.** Cada etapa do roteiro é feita numa branch curta (`etapa-03-testes`, `etapa-04-dominio`...) e entra na `main` por **Pull Request**, mesmo trabalhando sozinho.
+- Duas branches permanentes:
+  - **`main`** — versão estável; é o que vai para produção (deploy no Render a partir da etapa 10).
+  - **`dev`** — integração do dia a dia.
+- Cada etapa do roteiro nasce da `dev` numa branch curta (`etapa-03-testes`, `etapa-04-dominio`...) e volta para a `dev` por **Pull Request**, mesmo trabalhando sozinho.
+- Quando a `dev` estiver estável, um PR `dev → main` publica a versão.
 - Mensagens de commit no padrão **Conventional Commits**: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`, `ci:`.
 
 **Alternativas**
 - Commits direto na `main` — mais rápido, mas perde o histórico de PRs e o treino do fluxo usado em equipes.
-- Git Flow (`develop`, `release/*`) — pesado demais para um projeto com um desenvolvedor.
+- Só `main` + branches curtas (trunk-based) — mais simples; descartado para ter um ambiente de integração separado do que vai para produção.
+- Git Flow completo (`release/*`, `hotfix/*`) — pesado demais para um projeto com um desenvolvedor.
 
 **Consequências**
 - ✅ Cada PR documenta uma etapa e, a partir da etapa 9, passa pelo CI antes do merge.
-- ✅ Histórico legível e pronto para gerar changelog.
+- ✅ A `main` só recebe código já integrado na `dev`.
+- ⚠️ Um PR a mais (`dev → main`) por versão publicada.
+
+---
+
+## ADR-009 — Código em inglês
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+O código começou com nomes em português (`Pontuacao`, `Temporada`...). Inglês é o padrão do mercado, combina com as APIs do .NET e do React e facilita o uso de ferramentas e exemplos.
+
+**Decisão**
+- Todo o código em **inglês**: classes, métodos, propriedades, variáveis, testes, pastas de código, rotas da API e mensagens de exceção.
+- Documentação (`README.md`, `docs/`) continua em português.
+- Nomes de teste: `Method_Scenario_ExpectedResult` (ex.: `Create_ZeroDuration_Throws`).
+- Glossário do domínio:
+
+| Português (grupo) | Inglês (código) |
+|---|---|
+| Grupo / horário | Group |
+| Presidente | President |
+| Professor | Coach |
+| Mensalista | Regular (`PlayerType.Regular`) |
+| Suplente | Substitute (`PlayerType.Substitute`) |
+| Dupla | Pair |
+| Lista semanal | WeeklyList |
+| Escalação | Lineup |
+| Partida / jogo | Match |
+| Temporada | Season |
+| Pontuação | Scoring |
+| Futebol society | SevenASide |
+| Goleiro / zaga / meio / ataque | Goalkeeper / Defender / Midfielder / Forward |
+
+**Consequências**
+- ✅ Código consistente com o ecossistema .NET.
+- ⚠️ O glossário precisa ser mantido quando surgirem termos novos.
 
 ---
 
