@@ -181,6 +181,41 @@ Toda semana, no grupo do WhatsApp, alguém pergunta: *"Professor Fulano, cadê a
 
 ---
 
+## ADR-009 — Código em inglês
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+O código começou com nomes em português (`Pontuacao`, `Temporada`...). Inglês é o padrão do mercado, combina com as APIs do .NET e do React e facilita o uso de ferramentas e exemplos.
+
+**Decisão**
+- Todo o código em **inglês**: classes, métodos, propriedades, variáveis, testes, pastas de código, rotas da API e mensagens de exceção.
+- Documentação (`README.md`, `docs/`) continua em português.
+- Nomes de teste: `Method_Scenario_ExpectedResult` (ex.: `Create_ZeroDuration_Throws`).
+- Glossário do domínio:
+
+| Português (grupo) | Inglês (código) |
+|---|---|
+| Grupo / horário | Group |
+| Presidente | President |
+| Professor | Coach |
+| Mensalista | Regular (`PlayerType.Regular`) |
+| Suplente | Substitute (`PlayerType.Substitute`) |
+| Dupla | Pair |
+| Lista semanal | WeeklyList |
+| Escalação | Lineup |
+| Partida / jogo | Match |
+| Temporada | Season |
+| Pontuação | Scoring |
+| Futebol society | SevenASide |
+| Goleiro / zaga / meio / ataque | Goalkeeper / Defender / Midfielder / Forward |
+
+**Consequências**
+- ✅ Código consistente com o ecossistema .NET.
+- ⚠️ O glossário precisa ser mantido quando surgirem termos novos.
+
+---
+
 ## Modelo
 
 ```markdown
