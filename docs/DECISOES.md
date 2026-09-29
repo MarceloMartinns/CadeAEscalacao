@@ -202,6 +202,8 @@ O código começou com nomes em português (`Pontuacao`, `Temporada`...). Inglê
 | Mensalista | Regular (`PlayerType.Regular`) |
 | Suplente | Substitute (`PlayerType.Substitute`) |
 | Dupla | Pair |
+| Membro do grupo | GroupMember |
+| Rodízio de professores | CoachRotation |
 | Lista semanal | WeeklyList |
 | Escalação | Lineup |
 | Partida / jogo | Match |
@@ -213,6 +215,59 @@ O código começou com nomes em português (`Pontuacao`, `Temporada`...). Inglê
 **Consequências**
 - ✅ Código consistente com o ecossistema .NET.
 - ⚠️ O glossário precisa ser mantido quando surgirem termos novos.
+
+---
+
+## ADR-010 — Modelagem do domínio: agregados e IDs fortemente tipados
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+A etapa 4 cria as entidades. É preciso decidir onde fica cada regra, como as entidades se referenciam e qual tipo de ID usar antes de chegar ao banco (etapa 5).
+
+**Decisão**
+- Agregados (cada um salvo inteiro e com as próprias regras):
+  - `Player`: a pessoa (nome).
+  - `Group`: formato, dia, presidente, membros, duplas e rodízio de professores.
+  - `WeeklyList`: inscrições e vagas da semana.
+  - `Lineup`: escalação do professor.
+  - `Match`: placar e resultado de cada jogador.
+- Agregados se referenciam **por ID**, nunca por propriedade de navegação.
+- Mensalista/suplente é do **vínculo com o grupo** (`GroupMember`), não do `Player`: a mesma pessoa pode ser mensalista no society e suplente no futsal.
+- IDs fortemente tipados: `readonly record struct PlayerId(Guid Value)`, `GroupId`... gerados com `Guid.CreateVersion7()` (ordenáveis por data, bons para índice no Postgres).
+- O domínio não acessa repositório. Dados de fora (ex.: presenças na temporada) chegam como parâmetro.
+
+**Alternativas**
+- `Guid` puro — mais simples, mas o compilador não impede trocar o ID de um jogador pelo de um grupo.
+- `int` identity — o ID só existe depois de salvar e expõe a quantidade de registros na API.
+- `PlayerType` no `Player` — não atende quem joga nos dois grupos com tipos diferentes.
+
+**Consequências**
+- ✅ Erros de ID trocado viram erro de compilação.
+- ✅ Regras testáveis sem banco.
+- ⚠️ Na etapa 5 cada ID precisa de um `ValueConverter` no EF Core.
+
+---
+
+## ADR-011 — Violação de regra de negócio com `DomainException`
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+O domínio precisa sinalizar dois tipos de erro: argumento inválido (nome vazio) e regra de negócio quebrada (jogador já está em uma dupla). A API vai responder de forma diferente a cada um.
+
+**Decisão**
+- Argumento inválido: família `ArgumentException` (como já fazem `Season` e `MatchFormat`).
+- Regra de negócio: `DomainException` (`Domain/Common`), com mensagem em inglês.
+- Na etapa 6 a API converte `DomainException` em **422 Unprocessable Entity** (Problem Details).
+
+**Alternativas**
+- Result pattern (`Result<T>`) — explícito, mas adiciona muito código em um domínio pequeno; pode ser reavaliado depois.
+- Uma exceção por regra — granular demais por enquanto.
+
+**Consequências**
+- ✅ Testes simples: `Should.Throw<DomainException>`.
+- ⚠️ Exceções não aparecem na assinatura do método; os testes documentam quando cada uma ocorre.
 
 ---
 

@@ -41,18 +41,7 @@ O formato é configurável por grupo, assim como a **duração da temporada** (p
 
 ## 🗺️ Roteiro
 
-- [x] 1. Estrutura da solution
-- [ ] 2. Git, GitHub e documentação
-- [ ] 3. Projeto de testes e primeiras regras de domínio
-- [ ] 4. Modelagem do domínio (grupos, jogadores, duplas, rodízio de professor)
-- [ ] 5. Banco de dados (Supabase + EF Core + migrations)
-- [ ] 6. API (lista semanal, escalação, resultado, ranking)
-- [ ] 7. Autenticação e papéis (Supabase Auth)
-- [ ] 8. Telas em React
-- [ ] 9. CI com GitHub Actions
-- [ ] 10. Docker e deploy no Render
-- [ ] 11. IA (CLAUDE.md, skills, agente de escalação equilibrada)
-- [ ] 12. Extras (importar planilha, compartilhar no WhatsApp)
+O projeto é construído em 12 etapas, da estrutura da solution ao deploy e uso de IA. Detalhes e status de cada uma em [`docs/ROTEIRO.md`](docs/ROTEIRO.md).
 
 ## 🛠️ Stack
 
@@ -62,7 +51,7 @@ O formato é configurável por grupo, assim como a **duração da temporada** (p
 | Frontend | React · TypeScript · Vite |
 | Banco / Auth | Supabase (PostgreSQL + Supabase Auth) |
 | ORM | Entity Framework Core + Npgsql |
-| Testes | NUnit · Vitest · Playwright |
+| Testes | NUnit · Shouldly · Vitest · Playwright |
 | CI/CD | GitHub Actions |
 | Container | Docker |
 | Hospedagem | Render (app) · Supabase (banco) |
@@ -76,8 +65,10 @@ CadeAEscalacao/
 ├── CadeAEscalacao.Infrastructure/  # EF Core, Supabase, integrações
 ├── CadeAEscalacao.Server/          # API ASP.NET Core
 ├── cadeaescalacao.client/          # Front-end React (Vite)
+├── CadeAEscalacao.Domain.Tests/    # Testes do domínio (NUnit + Shouldly)
 ├── docs/
-│   └── DECISOES.md                 # Registro de decisões (ADRs)
+│   ├── DECISOES.md                 # Registro de decisões (ADRs)
+│   └── ROTEIRO.md                  # Etapas do projeto e status
 ├── README.md
 └── CadeAEscalacao.slnx
 ```
