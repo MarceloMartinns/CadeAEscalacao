@@ -2,6 +2,7 @@
   <Folder Name="/docs/">
     <File Path="README.md" />
     <File Path="docs/DECISOES.md" />
+    <File Path="docs/ROTEIRO.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="CadeAEscalacao.Application/CadeAEscalacao.Application.csproj" />
