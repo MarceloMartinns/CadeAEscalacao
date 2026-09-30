@@ -63,7 +63,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 - [x] `Player` — nome; o tipo (mensalista/suplente) fica em `GroupMember`, porque muda por grupo; as posições são informadas na lista semanal
 - [x] `Pair` — duplas definidas pelo presidente
 - [x] Rodízio de `Coach` (professor) — ordem definida pelo presidente
-- [ ] `WeeklyList` — confirmar, sair, entrar como suplente; limite de vagas; prioridade do mensalista
+- [x] `WeeklyList` — confirmar, sair, entrar como suplente; limite de vagas; prioridade do mensalista
 - [ ] `Lineup` — escalação dos dois times, sem o professor e sem a dupla dele; escolha de time pela dupla
 - [ ] `Match` — resultado e pontos
 - [ ] Temporada do grupo e ranking (pontos e presenças)
