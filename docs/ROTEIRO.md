@@ -14,8 +14,8 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 | 2 | Git, GitHub e documentação | ✅ |
 | 3 | Projeto de testes e primeiras regras de domínio | ✅ |
 | 4 | Modelagem do domínio | ✅ |
-| 5 | Banco de dados | 🚧 |
-| 6 | API | 🚧 |
+| 5 | Banco de dados | ✅ |
+| 6 | API | ✅ |
 | 7 | Autenticação e papéis | ⬜ |
 | 8 | Telas em React | ⬜ |
 | 9 | CI com GitHub Actions | ⬜ |
@@ -70,7 +70,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** entidades, value objects, agregados, invariantes, Domain-Driven Design tático, TDD.
 
-## 5. Banco de dados 🚧
+## 5. Banco de dados ✅
 **Objetivo:** persistir o domínio no Supabase (decisões na ADR-012).
 
 - [x] Criar projeto `cadeaescalacao-dev` no Supabase (plano gratuito, Session pooler)
@@ -82,7 +82,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** EF Core, Npgsql, migrations, owned types, complex types, value converters, concorrência otimista.
 
-## 6. API 🚧
+## 6. API ✅
 **Objetivo:** expor os casos de uso por HTTP.
 
 - [x] Decidir: Controllers ou Minimal APIs → Minimal APIs (ADR-013)

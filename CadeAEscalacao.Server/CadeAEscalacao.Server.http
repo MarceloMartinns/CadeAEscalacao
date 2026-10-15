@@ -1,70 +1,154 @@
 @host = http://localhost:5085
 
-# Fluxo de exemplo da API (etapa 6). Rode as requisições em ordem e copie os IDs
-# das respostas para as variáveis abaixo. Atenção: grava no banco de dev (Supabase).
-@presidentId = 00000000-0000-0000-0000-000000000000
-@playerId = 00000000-0000-0000-0000-000000000000
-@groupId = 00000000-0000-0000-0000-000000000000
-@listId = 00000000-0000-0000-0000-000000000000
-@lineupId = 00000000-0000-0000-0000-000000000000
-@seasonId = 00000000-0000-0000-0000-000000000000
-
-### Cadastrar jogador
+### 1. Cadastrar o presidente
+# @name president
 POST {{host}}/api/players
 Content-Type: application/json
 
 { "name": "Marcelo" }
 
-### Criar grupo (o presidente entra como mensalista)
+### 2. Cadastrar mais três jogadores
+# @name joao
+POST {{host}}/api/players
+Content-Type: application/json
+
+{ "name": "João" }
+
+###
+# @name pedro
+POST {{host}}/api/players
+Content-Type: application/json
+
+{ "name": "Pedro" }
+
+###
+# @name lucas
+POST {{host}}/api/players
+Content-Type: application/json
+
+{ "name": "Lucas" }
+
+### 3. Criar o grupo (o presidente entra como mensalista e no rodízio)
+# @name group
 POST {{host}}/api/groups
 Content-Type: application/json
 
-{ "name": "Society de terça", "playersPerTeam": 7, "benchPlayersPerTeam": 1, "matchDay": "Tuesday", "presidentId": "{{presidentId}}" }
+{ "name": "Teste manual", "playersPerTeam": 2, "benchPlayersPerTeam": 0, "matchDay": "Tuesday", "presidentId": "{{president.response.body.$.id}}" }
 
-### Adicionar membro
-POST {{host}}/api/groups/{{groupId}}/members
+### 4. Adicionar membros
+POST {{host}}/api/groups/{{group.response.body.$.id}}/members
 Content-Type: application/json
 
-{ "playerId": "{{playerId}}", "type": "Substitute" }
+{ "playerId": "{{joao.response.body.$.id}}", "type": "Regular" }
 
-### Criar temporada
-POST {{host}}/api/groups/{{groupId}}/seasons
+###
+POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+Content-Type: application/json
+
+{ "playerId": "{{pedro.response.body.$.id}}", "type": "Substitute" }
+
+###
+POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+Content-Type: application/json
+
+{ "playerId": "{{lucas.response.body.$.id}}", "type": "Substitute" }
+
+### 5. Criar a dupla Marcelo + João
+POST {{host}}/api/groups/{{group.response.body.$.id}}/pairs
+Content-Type: application/json
+
+{ "firstPlayerId": "{{president.response.body.$.id}}", "secondPlayerId": "{{joao.response.body.$.id}}" }
+
+### 6. Criar a temporada (6 meses)
+# @name season
+POST {{host}}/api/groups/{{group.response.body.$.id}}/seasons
 Content-Type: application/json
 
 { "name": "2026/2", "start": "2026-07-01" }
 
-### Abrir lista semanal
-POST {{host}}/api/groups/{{groupId}}/lists
+### 7. Abrir a lista (mensalistas aparecem em "pending")
+# @name list
+POST {{host}}/api/groups/{{group.response.body.$.id}}/lists
 Content-Type: application/json
 
 { "matchDate": "2026-10-20" }
 
-### Confirmar presença
-POST {{host}}/api/lists/{{listId}}/entries
+### 8. Todos confirmam presença
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
 Content-Type: application/json
 
-{ "playerId": "{{presidentId}}", "positions": ["Midfielder", "Forward"] }
+{ "playerId": "{{president.response.body.$.id}}", "positions": ["Defender"] }
 
-### Ver lista
-GET {{host}}/api/lists/{{listId}}
-
-### Fechar lista
-POST {{host}}/api/lists/{{listId}}/close
-
-### Iniciar escalação
-POST {{host}}/api/lists/{{listId}}/lineup
-
-### Ver escalação
-GET {{host}}/api/lineups/{{lineupId}}
-
-### Registrar resultado
-POST {{host}}/api/lineups/{{lineupId}}/match
+###
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
 Content-Type: application/json
 
-{ "goalsA": 3, "goalsB": 2 }
+{ "playerId": "{{joao.response.body.$.id}}", "positions": ["Midfielder", "Forward"] }
 
-### Ranking da temporada
-GET {{host}}/api/seasons/{{seasonId}}/ranking
+###
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Content-Type: application/json
+
+{ "playerId": "{{pedro.response.body.$.id}}", "positions": ["Goalkeeper"] }
+
+###
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Content-Type: application/json
+
+{ "playerId": "{{lucas.response.body.$.id}}", "positions": ["Forward"] }
+
+### 9. Ver a lista (4 em "playing", 0 vagas abertas)
+GET {{host}}/api/lists/{{list.response.body.$.id}}
+
+### 10. Fechar a lista
+POST {{host}}/api/lists/{{list.response.body.$.id}}/close
+
+### 11. Iniciar a escalação (professor: Marcelo; parceiro: João)
+# @name lineup
+POST {{host}}/api/lists/{{list.response.body.$.id}}/lineup
+
+### 12. O professor divide os outros jogadores
+PUT {{host}}/api/lineups/{{lineup.response.body.$.id}}/teams
+Content-Type: application/json
+
+{ "teamA": ["{{pedro.response.body.$.id}}"], "teamB": ["{{lucas.response.body.$.id}}"] }
+
+### 13. O parceiro escolhe o time A (o professor vai para o B)
+POST {{host}}/api/lineups/{{lineup.response.body.$.id}}/choice
+Content-Type: application/json
+
+{ "team": "A" }
+
+### 14. Registrar o resultado (time A venceu)
+# @name match
+POST {{host}}/api/lineups/{{lineup.response.body.$.id}}/match
+Content-Type: application/json
+
+{ "goalsA": 3, "goalsB": 1 }
+
+### 15. Ranking (João e Pedro em 1º com 3 pontos)
+GET {{host}}/api/seasons/{{season.response.body.$.id}}/ranking
+
+### 16. Grupo: Marcelo foi para o fim do rodízio
+GET {{host}}/api/groups/{{group.response.body.$.id}}
+
+### Erros: abrir de novo a lista da mesma data → 409
+POST {{host}}/api/groups/{{group.response.body.$.id}}/lists
+Content-Type: application/json
+
+{ "matchDate": "2026-10-20" }
+
+### Erros: inscrição sem posição → 400 com "errors"
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Content-Type: application/json
+
+{ "playerId": "{{pedro.response.body.$.id}}", "positions": [] }
+
+### Erros: inscrever na lista fechada → 422
+POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Content-Type: application/json
+
+{ "playerId": "{{pedro.response.body.$.id}}", "positions": ["Forward"] }
 
 ### Documento OpenAPI
 GET {{host}}/openapi/v1.json
