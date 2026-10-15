@@ -13,8 +13,8 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 | 1 | Estrutura da solution | ✅ |
 | 2 | Git, GitHub e documentação | ✅ |
 | 3 | Projeto de testes e primeiras regras de domínio | ✅ |
-| 4 | Modelagem do domínio | ⬜ |
-| 5 | Banco de dados | ⬜ |
+| 4 | Modelagem do domínio | ✅ |
+| 5 | Banco de dados | 🚧 |
 | 6 | API | ⬜ |
 | 7 | Autenticação e papéis | ⬜ |
 | 8 | Telas em React | ⬜ |
@@ -53,31 +53,34 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** NUnit (`[Test]`, `[TestCase]`), Shouldly, nomenclatura de testes.
 
-## 4. Modelagem do domínio ⬜
+## 4. Modelagem do domínio ✅
 **Objetivo:** levar as regras da pelada para o Domain, com testes.
 
-- [ ] Confirmar a regra: quem escolhe o time após a escalação (dupla do professor ou do presidente)
-- [ ] `Group` — grupo/horário, com formato do jogo e temporada atual
-- [ ] `Player` — nome, posições, tipo (mensalista/suplente)
-- [ ] `Pair` — duplas definidas pelo presidente
-- [ ] Rodízio de `Coach` (professor) — ordem definida pelo presidente
-- [ ] `WeeklyList` — confirmar, sair, entrar como suplente; limite de vagas; prioridade do mensalista
-- [ ] `Lineup` — escalação dos dois times, sem o professor e sem a dupla dele; escolha de time pela dupla
-- [ ] `Match` — resultado e pontos
-- [ ] Ranking da temporada (pontos e presenças)
+> A primeira parte foi feita junto com a etapa 3 (branch `etapa-03-testes`). O restante é concluído na branch `etapa-05-banco-de-dados`, antes do mapeamento no banco.
+
+- [x] Regra confirmada: quem escolhe o time após a escalação é a dupla do professor
+- [x] `Group` — grupo/horário, com formato do jogo, dia, membros e presidente
+- [x] `Player` — nome; o tipo (mensalista/suplente) fica em `GroupMember`, porque muda por grupo; as posições são informadas na lista semanal
+- [x] `Pair` — duplas definidas pelo presidente
+- [x] Rodízio de `Coach` (professor) — ordem definida pelo presidente
+- [x] `WeeklyList` — confirmar, sair, entrar como suplente; limite de vagas; prioridade do mensalista
+- [x] `Lineup` — escalação dos dois times, sem o professor e sem a dupla dele; escolha de time pela dupla
+- [x] `Match` — resultado e pontos
+- [x] Temporada do grupo e ranking (pontos e presenças)
 
 **Estudo:** entidades, value objects, agregados, invariantes, Domain-Driven Design tático, TDD.
 
-## 5. Banco de dados ⬜
-**Objetivo:** persistir o domínio no Supabase.
+## 5. Banco de dados 🚧
+**Objetivo:** persistir o domínio no Supabase (decisões na ADR-012).
 
-- [ ] Criar projeto no Supabase (plano gratuito)
-- [ ] `DbContext` e mapeamentos (`IEntityTypeConfiguration<T>`) no Infrastructure
-- [ ] Migrations com EF Core
-- [ ] Connection string via `dotnet user-secrets`
-- [ ] Testes de integração com Testcontainers (PostgreSQL)
+- [x] Criar projeto `cadeaescalacao-dev` no Supabase (plano gratuito, Session pooler)
+- [x] Connection string via User Secrets do Server
+- [x] Pacotes: Npgsql EF Core, `EFCore.NamingConventions`, `Microsoft.EntityFrameworkCore.Design`, `dotnet-ef`
+- [x] `AppDbContext` e mapeamentos (`IEntityTypeConfiguration<T>`) no Infrastructure
+- [x] Migration `InitialCreate` gerada, revisada e aplicada no banco de dev
+- [ ] Testes de integração com Testcontainers (PostgreSQL) — adiados para a etapa 10 (Docker)
 
-**Estudo:** EF Core, Npgsql, migrations, repositórios, Docker Desktop para os testes.
+**Estudo:** EF Core, Npgsql, migrations, owned types, complex types, value converters, concorrência otimista.
 
 ## 6. API ⬜
 **Objetivo:** expor os casos de uso por HTTP.
