@@ -16,5 +16,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="CadeAEscalacao.Domain.Tests/CadeAEscalacao.Domain.Tests.csproj" Id="c5968dba-71fa-4834-a55f-47a5e3a9948b" />
+    <Project Path="CadeAEscalacao.Server.Tests/CadeAEscalacao.Server.Tests.csproj" />
   </Folder>
 </Solution>
