@@ -2,6 +2,7 @@
   <Folder Name="/docs/">
     <File Path="README.md" />
     <File Path="docs/DECISOES.md" />
+    <File Path="docs/ROTEIRO.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="CadeAEscalacao.Application/CadeAEscalacao.Application.csproj" />
@@ -12,5 +13,8 @@
     <Project Path="CadeAEscalacao.Domain/CadeAEscalacao.Domain.csproj" />
     <Project Path="CadeAEscalacao.Infrastructure/CadeAEscalacao.Infrastructure.csproj" />
     <Project Path="CadeAEscalacao.Server/CadeAEscalacao.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="CadeAEscalacao.Domain.Tests/CadeAEscalacao.Domain.Tests.csproj" Id="c5968dba-71fa-4834-a55f-47a5e3a9948b" />
   </Folder>
 </Solution>

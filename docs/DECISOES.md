@@ -162,16 +162,151 @@ Toda semana, no grupo do WhatsApp, alguém pergunta: *"Professor Fulano, cadê a
 
 **Decisão**
 - Repositório no GitHub: `cade-a-escalacao`.
-- **`main` sempre funcionando.** Cada etapa do roteiro é feita numa branch curta (`etapa-03-testes`, `etapa-04-dominio`...) e entra na `main` por **Pull Request**, mesmo trabalhando sozinho.
+- Duas branches permanentes:
+  - **`main`** — versão estável; é o que vai para produção (deploy no Render a partir da etapa 10).
+  - **`dev`** — integração do dia a dia.
+- Cada etapa do roteiro nasce da `dev` numa branch curta (`etapa-03-testes`, `etapa-04-dominio`...) e volta para a `dev` por **Pull Request**, mesmo trabalhando sozinho.
+- Quando a `dev` estiver estável, um PR `dev → main` publica a versão.
 - Mensagens de commit no padrão **Conventional Commits**: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`, `ci:`.
 
 **Alternativas**
 - Commits direto na `main` — mais rápido, mas perde o histórico de PRs e o treino do fluxo usado em equipes.
-- Git Flow (`develop`, `release/*`) — pesado demais para um projeto com um desenvolvedor.
+- Só `main` + branches curtas (trunk-based) — mais simples; descartado para ter um ambiente de integração separado do que vai para produção.
+- Git Flow completo (`release/*`, `hotfix/*`) — pesado demais para um projeto com um desenvolvedor.
 
 **Consequências**
 - ✅ Cada PR documenta uma etapa e, a partir da etapa 9, passa pelo CI antes do merge.
-- ✅ Histórico legível e pronto para gerar changelog.
+- ✅ A `main` só recebe código já integrado na `dev`.
+- ⚠️ Um PR a mais (`dev → main`) por versão publicada.
+
+---
+
+## ADR-009 — Código em inglês
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+O código começou com nomes em português (`Pontuacao`, `Temporada`...). Inglês é o padrão do mercado, combina com as APIs do .NET e do React e facilita o uso de ferramentas e exemplos.
+
+**Decisão**
+- Todo o código em **inglês**: classes, métodos, propriedades, variáveis, testes, pastas de código, rotas da API e mensagens de exceção.
+- Documentação (`README.md`, `docs/`) continua em português.
+- Nomes de teste: `Method_Scenario_ExpectedResult` (ex.: `Create_ZeroDuration_Throws`).
+- Glossário do domínio:
+
+| Português (grupo) | Inglês (código) |
+|---|---|
+| Grupo / horário | Group |
+| Presidente | President |
+| Professor | Coach |
+| Mensalista | Regular (`PlayerType.Regular`) |
+| Suplente | Substitute (`PlayerType.Substitute`) |
+| Dupla | Pair |
+| Membro do grupo | GroupMember |
+| Rodízio de professores | CoachRotation |
+| Lista semanal | WeeklyList |
+| Escalação | Lineup |
+| Partida / jogo | Match |
+| Temporada | Season |
+| Pontuação | Scoring |
+| Futebol society | SevenASide |
+| Goleiro / zaga / meio / ataque | Goalkeeper / Defender / Midfielder / Forward |
+
+**Consequências**
+- ✅ Código consistente com o ecossistema .NET.
+- ⚠️ O glossário precisa ser mantido quando surgirem termos novos.
+
+---
+
+## ADR-010 — Modelagem do domínio: agregados e IDs fortemente tipados
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+A etapa 4 cria as entidades. É preciso decidir onde fica cada regra, como as entidades se referenciam e qual tipo de ID usar antes de chegar ao banco (etapa 5).
+
+**Decisão**
+- Agregados (cada um salvo inteiro e com as próprias regras):
+  - `Player`: a pessoa (nome).
+  - `Group`: formato, dia, presidente, membros, duplas e rodízio de professores.
+  - `WeeklyList`: inscrições e vagas da semana.
+  - `Lineup`: escalação do professor.
+  - `Match`: placar e resultado de cada jogador.
+- Agregados se referenciam **por ID**, nunca por propriedade de navegação.
+- Mensalista/suplente é do **vínculo com o grupo** (`GroupMember`), não do `Player`: a mesma pessoa pode ser mensalista no society e suplente no futsal.
+- IDs fortemente tipados: `readonly record struct PlayerId(Guid Value)`, `GroupId`... gerados com `Guid.CreateVersion7()` (ordenáveis por data, bons para índice no Postgres).
+- O domínio não acessa repositório. Dados de fora (ex.: presenças na temporada) chegam como parâmetro.
+
+**Alternativas**
+- `Guid` puro — mais simples, mas o compilador não impede trocar o ID de um jogador pelo de um grupo.
+- `int` identity — o ID só existe depois de salvar e expõe a quantidade de registros na API.
+- `PlayerType` no `Player` — não atende quem joga nos dois grupos com tipos diferentes.
+
+**Consequências**
+- ✅ Erros de ID trocado viram erro de compilação.
+- ✅ Regras testáveis sem banco.
+- ⚠️ Na etapa 5 cada ID precisa de um `ValueConverter` no EF Core.
+
+---
+
+## ADR-011 — Violação de regra de negócio com `DomainException`
+
+**Status:** Aceita · **Data:** 2026-09-29
+
+**Contexto**
+O domínio precisa sinalizar dois tipos de erro: argumento inválido (nome vazio) e regra de negócio quebrada (jogador já está em uma dupla). A API vai responder de forma diferente a cada um.
+
+**Decisão**
+- Argumento inválido: família `ArgumentException` (como já fazem `Season` e `MatchFormat`).
+- Regra de negócio: `DomainException` (`Domain/Common`), com mensagem em inglês.
+- Na etapa 6 a API converte `DomainException` em **422 Unprocessable Entity** (Problem Details).
+
+**Alternativas**
+- Result pattern (`Result<T>`) — explícito, mas adiciona muito código em um domínio pequeno; pode ser reavaliado depois.
+- Uma exceção por regra — granular demais por enquanto.
+
+**Consequências**
+- ✅ Testes simples: `Should.Throw<DomainException>`.
+- ⚠️ Exceções não aparecem na assinatura do método; os testes documentam quando cada uma ocorre.
+
+---
+
+## ADR-012 — Banco de dados: Supabase, EF Core e mapeamento dos agregados
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+A etapa 5 persiste o domínio (ADR-010) no PostgreSQL do Supabase (ADR-003). O Docker ainda não está instalado, então não há Postgres local. Os agregados têm IDs fortemente tipados, coleções privadas e value objects, e o domínio não deve depender do EF Core.
+
+**Decisão**
+- **Banco de desenvolvimento no Supabase**, projeto `cadeaescalacao-dev` (região São Paulo). O de produção é criado na etapa 10; o plano gratuito permite 2 projetos ativos.
+- **Conexão pelo Session pooler** (porta 5432, usuário `postgres.<ref>`). A conexão direta só funciona por IPv6 no plano gratuito, e o Transaction pooler (6543) não suporta prepared statements.
+- **Schema `public`**, com "Automatically expose new tables" desmarcado: as tabelas não ficam acessíveis pela Data API do Supabase. O React nunca acessa o banco direto.
+- **Connection string em User Secrets** do `CadeAEscalacao.Server`, chave `ConnectionStrings:Default`, no formato Npgsql (`Host=...;Port=5432;Database=postgres;Username=postgres.<ref>;Password=...;SSL Mode=Require`). Nunca no `appsettings.json`.
+- **EF Core 10 + Npgsql**, nomes em `snake_case` (`EFCore.NamingConventions`). Mapeamento em `Infrastructure/Persistence`, um `IEntityTypeConfiguration<T>` por agregado:
+  - IDs fortemente tipados → `uuid`, com um `ValueConverter` por tipo registrado em `ConfigureConventions`. As chaves usam `ValueGeneratedNever` (o domínio gera Guid v7).
+  - `GroupMember`, `Pair` e `WeeklyListEntry` → *owned collections* em tabelas filhas (`group_members`, `group_pairs`, `weekly_list_entries`), com chave composta (agregado + jogador).
+  - `MatchFormat` → *complex type* (colunas `players_per_team` e `bench_players_per_team` em `groups`).
+  - Listas ordenadas de jogadores (rodízio de professores, jogadores e times de `Lineup`/`Match`) → arrays `uuid[]`, com converter e `ValueComparer`.
+  - Chaves estrangeiras entre agregados no banco (sem propriedades de navegação no domínio), todas com `Restrict`.
+  - Índices únicos: uma lista por grupo e data (`weekly_lists`), uma escalação por lista, uma partida por escalação.
+- **Concorrência otimista com uma coluna `version`** (propriedade de sombra) em cada raiz de agregado. O `AppDbContext` incrementa a versão sempre que o agregado ou uma das suas tabelas filhas muda. Assim, duas inscrições simultâneas na mesma lista não passam ambas: a segunda recebe `DbUpdateConcurrencyException`.
+- **Ajustes mínimos no Domain:** construtor privado sem parâmetros em `Group` (o EF não passa complex type no construtor) e as listas de IDs de `Group`, `Lineup` e `Match` deixam de ser `readonly` (o EF as atribui ao carregar).
+- **Testes de integração com Testcontainers adiados** até a instalação do Docker (etapa 10). Até lá, as migrations são validadas aplicando no banco de dev.
+
+**Alternativas**
+- Postgres local via Docker — mais isolado, mas o Docker ainda não está instalado.
+- Schema próprio (`app`) — descartado: com a exposição automática desligada, o `public` já não aparece na Data API.
+- Coluna `xmin` do Postgres como token de concorrência — não detecta mudanças só nas tabelas filhas (uma nova inscrição insere em `weekly_list_entries` sem alterar a linha de `weekly_lists`).
+- Coleções em JSON (`jsonb`) — menos tabelas, mas sem chave estrangeira para `players` e com consultas mais difíceis.
+- Tabela para o rodízio com coluna de posição — mais normalizada, mas o array já guarda a ordem e o rodízio só é lido inteiro.
+
+**Consequências**
+- ✅ O domínio continua sem referência ao EF Core; o mapeamento fica todo no Infrastructure.
+- ✅ Integridade garantida no banco (chaves estrangeiras e índices únicos) além das regras do domínio.
+- ⚠️ O projeto de dev pausa após 7 dias sem uso; reativar pelo painel do Supabase.
+- ⚠️ A Application precisa tratar `DbUpdateConcurrencyException` (tentar de novo ou devolver 409) na etapa 6.
+- ⚠️ Arrays `uuid[]` não têm chave estrangeira; a consistência dos IDs nos times depende do domínio.
 
 ---
 
