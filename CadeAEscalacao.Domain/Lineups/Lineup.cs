@@ -24,9 +24,10 @@ namespace CadeAEscalacao.Domain.Lineups;
 /// </remarks>
 public sealed class Lineup
 {
-    private readonly List<PlayerId> _players = [];
-    private readonly List<PlayerId> _teamA = [];
-    private readonly List<PlayerId> _teamB = [];
+    // Not readonly: EF Core sets them when loading (stored as uuid[] columns, ADR-012).
+    private List<PlayerId> _players = [];
+    private List<PlayerId> _teamA = [];
+    private List<PlayerId> _teamB = [];
 
     private Lineup(LineupId id, GroupId groupId, WeeklyListId weeklyListId, PlayerId coachId, PlayerId? partnerId)
     {

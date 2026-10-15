@@ -21,7 +21,8 @@ public sealed class Group
 {
     private readonly List<GroupMember> _members = [];
     private readonly List<Pair> _pairs = [];
-    private readonly List<PlayerId> _coachRotation = [];
+    // Not readonly: EF Core sets it when loading (stored as a uuid[] column, ADR-012).
+    private List<PlayerId> _coachRotation = [];
 
     private Group(GroupId id, string name, MatchFormat format, DayOfWeek matchDay, PlayerId presidentId)
     {
@@ -30,6 +31,16 @@ public sealed class Group
         Format = format;
         MatchDay = matchDay;
         PresidentId = presidentId;
+    }
+
+    /// <summary>
+    /// Used by EF Core only: it cannot pass the <see cref="MatchFormat"/> (complex type)
+    /// to the constructor above, so it sets the properties after creating the object.
+    /// </summary>
+    private Group()
+    {
+        Name = null!;
+        Format = null!;
     }
 
     public GroupId Id { get; }

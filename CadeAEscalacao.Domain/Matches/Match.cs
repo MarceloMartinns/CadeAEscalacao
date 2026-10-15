@@ -12,8 +12,9 @@ namespace CadeAEscalacao.Domain.Matches;
 /// </summary>
 public sealed class Match
 {
-    private readonly List<PlayerId> _teamA = [];
-    private readonly List<PlayerId> _teamB = [];
+    // Not readonly: EF Core sets them when loading (stored as uuid[] columns, ADR-012).
+    private List<PlayerId> _teamA = [];
+    private List<PlayerId> _teamB = [];
 
     private Match(MatchId id, GroupId groupId, LineupId lineupId, DateOnly date, int goalsA, int goalsB)
     {

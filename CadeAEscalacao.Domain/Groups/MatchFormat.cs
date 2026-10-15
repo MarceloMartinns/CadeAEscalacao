@@ -14,9 +14,16 @@ public sealed record MatchFormat
         BenchPlayersPerTeam = benchPlayersPerTeam;
     }
 
-    public int PlayersPerTeam { get; }
+    /// <summary>
+    /// Used by EF Core only (complex type): it creates the object and then sets the properties.
+    /// </summary>
+    private MatchFormat()
+    {
+    }
 
-    public int BenchPlayersPerTeam { get; }
+    public int PlayersPerTeam { get; private set; }
+
+    public int BenchPlayersPerTeam { get; private set; }
 
     public int SpotsPerTeam => PlayersPerTeam + BenchPlayersPerTeam;
 
