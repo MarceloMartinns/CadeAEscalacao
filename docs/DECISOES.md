@@ -271,6 +271,45 @@ O domínio precisa sinalizar dois tipos de erro: argumento inválido (nome vazio
 
 ---
 
+## ADR-012 — Banco de dados: Supabase, EF Core e mapeamento dos agregados
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+A etapa 5 persiste o domínio (ADR-010) no PostgreSQL do Supabase (ADR-003). O Docker ainda não está instalado, então não há Postgres local. Os agregados têm IDs fortemente tipados, coleções privadas e value objects, e o domínio não deve depender do EF Core.
+
+**Decisão**
+- **Banco de desenvolvimento no Supabase**, projeto `cadeaescalacao-dev` (região São Paulo). O de produção é criado na etapa 10; o plano gratuito permite 2 projetos ativos.
+- **Conexão pelo Session pooler** (porta 5432, usuário `postgres.<ref>`). A conexão direta só funciona por IPv6 no plano gratuito, e o Transaction pooler (6543) não suporta prepared statements.
+- **Schema `public`**, com "Automatically expose new tables" desmarcado: as tabelas não ficam acessíveis pela Data API do Supabase. O React nunca acessa o banco direto.
+- **Connection string em User Secrets** do `CadeAEscalacao.Server`, chave `ConnectionStrings:Default`, no formato Npgsql (`Host=...;Port=5432;Database=postgres;Username=postgres.<ref>;Password=...;SSL Mode=Require`). Nunca no `appsettings.json`.
+- **EF Core 10 + Npgsql**, nomes em `snake_case` (`EFCore.NamingConventions`). Mapeamento em `Infrastructure/Persistence`, um `IEntityTypeConfiguration<T>` por agregado:
+  - IDs fortemente tipados → `uuid`, com um `ValueConverter` por tipo registrado em `ConfigureConventions`. As chaves usam `ValueGeneratedNever` (o domínio gera Guid v7).
+  - `GroupMember`, `Pair` e `WeeklyListEntry` → *owned collections* em tabelas filhas (`group_members`, `group_pairs`, `weekly_list_entries`), com chave composta (agregado + jogador).
+  - `MatchFormat` → *complex type* (colunas `players_per_team` e `bench_players_per_team` em `groups`).
+  - Listas ordenadas de jogadores (rodízio de professores, jogadores e times de `Lineup`/`Match`) → arrays `uuid[]`, com converter e `ValueComparer`.
+  - Chaves estrangeiras entre agregados no banco (sem propriedades de navegação no domínio), todas com `Restrict`.
+  - Índices únicos: uma lista por grupo e data (`weekly_lists`), uma escalação por lista, uma partida por escalação.
+- **Concorrência otimista com uma coluna `version`** (propriedade de sombra) em cada raiz de agregado. O `AppDbContext` incrementa a versão sempre que o agregado ou uma das suas tabelas filhas muda. Assim, duas inscrições simultâneas na mesma lista não passam ambas: a segunda recebe `DbUpdateConcurrencyException`.
+- **Ajustes mínimos no Domain:** construtor privado sem parâmetros em `Group` (o EF não passa complex type no construtor) e as listas de IDs de `Group`, `Lineup` e `Match` deixam de ser `readonly` (o EF as atribui ao carregar).
+- **Testes de integração com Testcontainers adiados** até a instalação do Docker (etapa 10). Até lá, as migrations são validadas aplicando no banco de dev.
+
+**Alternativas**
+- Postgres local via Docker — mais isolado, mas o Docker ainda não está instalado.
+- Schema próprio (`app`) — descartado: com a exposição automática desligada, o `public` já não aparece na Data API.
+- Coluna `xmin` do Postgres como token de concorrência — não detecta mudanças só nas tabelas filhas (uma nova inscrição insere em `weekly_list_entries` sem alterar a linha de `weekly_lists`).
+- Coleções em JSON (`jsonb`) — menos tabelas, mas sem chave estrangeira para `players` e com consultas mais difíceis.
+- Tabela para o rodízio com coluna de posição — mais normalizada, mas o array já guarda a ordem e o rodízio só é lido inteiro.
+
+**Consequências**
+- ✅ O domínio continua sem referência ao EF Core; o mapeamento fica todo no Infrastructure.
+- ✅ Integridade garantida no banco (chaves estrangeiras e índices únicos) além das regras do domínio.
+- ⚠️ O projeto de dev pausa após 7 dias sem uso; reativar pelo painel do Supabase.
+- ⚠️ A Application precisa tratar `DbUpdateConcurrencyException` (tentar de novo ou devolver 409) na etapa 6.
+- ⚠️ Arrays `uuid[]` não têm chave estrangeira; a consistência dos IDs nos times depende do domínio.
+
+---
+
 ## Modelo
 
 ```markdown
