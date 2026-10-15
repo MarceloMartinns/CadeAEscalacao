@@ -15,7 +15,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 | 3 | Projeto de testes e primeiras regras de domínio | ✅ |
 | 4 | Modelagem do domínio | ✅ |
 | 5 | Banco de dados | 🚧 |
-| 6 | API | ⬜ |
+| 6 | API | 🚧 |
 | 7 | Autenticação e papéis | ⬜ |
 | 8 | Telas em React | ⬜ |
 | 9 | CI com GitHub Actions | ⬜ |
@@ -82,15 +82,15 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** EF Core, Npgsql, migrations, owned types, complex types, value converters, concorrência otimista.
 
-## 6. API ⬜
+## 6. API 🚧
 **Objetivo:** expor os casos de uso por HTTP.
 
-- [ ] Decidir: Controllers ou Minimal APIs (novo ADR)
-- [ ] Casos de uso na Application (`Lists/`, `Lineups/`, `Matches/`, `Rankings/`)
-- [ ] Endpoints: lista semanal, escalação, resultado, ranking
-- [ ] Validação de entrada e tratamento de erros (ProblemDetails)
-- [ ] Documentação OpenAPI
-- [ ] Testes de integração com `WebApplicationFactory` e mocks com NSubstitute
+- [x] Decidir: Controllers ou Minimal APIs → Minimal APIs (ADR-013)
+- [x] Casos de uso na Application (`Lists/`, `Lineups/`, `Matches/`, `Rankings/`), mais cadastro mínimo (`Players/`, `Groups/`, `Seasons/`)
+- [x] Endpoints: lista semanal, escalação, resultado, ranking (e cadastro mínimo)
+- [x] Validação de entrada (`AddValidation`) e tratamento de erros (ProblemDetails: 400, 404, 409, 422)
+- [x] Documentação OpenAPI (`/openapi/v1.json` em desenvolvimento)
+- [x] Testes de integração com `WebApplicationFactory` e mocks com NSubstitute (`CadeAEscalacao.Server.Tests`)
 
 **Estudo:** ASP.NET Core, injeção de dependência, vertical slices, testes de API.
 

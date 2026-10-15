@@ -1,6 +1,70 @@
-@CadeAEscalacao.Server_HostAddress = http://localhost:5085
+@host = http://localhost:5085
 
-GET {{CadeAEscalacao.Server_HostAddress}}/weatherforecast/
-Accept: application/json
+# Fluxo de exemplo da API (etapa 6). Rode as requisições em ordem e copie os IDs
+# das respostas para as variáveis abaixo. Atenção: grava no banco de dev (Supabase).
+@presidentId = 00000000-0000-0000-0000-000000000000
+@playerId = 00000000-0000-0000-0000-000000000000
+@groupId = 00000000-0000-0000-0000-000000000000
+@listId = 00000000-0000-0000-0000-000000000000
+@lineupId = 00000000-0000-0000-0000-000000000000
+@seasonId = 00000000-0000-0000-0000-000000000000
 
-###
+### Cadastrar jogador
+POST {{host}}/api/players
+Content-Type: application/json
+
+{ "name": "Marcelo" }
+
+### Criar grupo (o presidente entra como mensalista)
+POST {{host}}/api/groups
+Content-Type: application/json
+
+{ "name": "Society de terça", "playersPerTeam": 7, "benchPlayersPerTeam": 1, "matchDay": "Tuesday", "presidentId": "{{presidentId}}" }
+
+### Adicionar membro
+POST {{host}}/api/groups/{{groupId}}/members
+Content-Type: application/json
+
+{ "playerId": "{{playerId}}", "type": "Substitute" }
+
+### Criar temporada
+POST {{host}}/api/groups/{{groupId}}/seasons
+Content-Type: application/json
+
+{ "name": "2026/2", "start": "2026-07-01" }
+
+### Abrir lista semanal
+POST {{host}}/api/groups/{{groupId}}/lists
+Content-Type: application/json
+
+{ "matchDate": "2026-10-20" }
+
+### Confirmar presença
+POST {{host}}/api/lists/{{listId}}/entries
+Content-Type: application/json
+
+{ "playerId": "{{presidentId}}", "positions": ["Midfielder", "Forward"] }
+
+### Ver lista
+GET {{host}}/api/lists/{{listId}}
+
+### Fechar lista
+POST {{host}}/api/lists/{{listId}}/close
+
+### Iniciar escalação
+POST {{host}}/api/lists/{{listId}}/lineup
+
+### Ver escalação
+GET {{host}}/api/lineups/{{lineupId}}
+
+### Registrar resultado
+POST {{host}}/api/lineups/{{lineupId}}/match
+Content-Type: application/json
+
+{ "goalsA": 3, "goalsB": 2 }
+
+### Ranking da temporada
+GET {{host}}/api/seasons/{{seasonId}}/ranking
+
+### Documento OpenAPI
+GET {{host}}/openapi/v1.json

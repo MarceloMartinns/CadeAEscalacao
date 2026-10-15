@@ -1,3 +1,4 @@
+using CadeAEscalacao.Application.Abstractions;
 using CadeAEscalacao.Domain.Groups;
 using CadeAEscalacao.Domain.Lineups;
 using CadeAEscalacao.Domain.Matches;
@@ -14,7 +15,7 @@ namespace CadeAEscalacao.Infrastructure.Persistence;
 /// One DbSet per aggregate root. Members, pairs and list entries are owned by their aggregate
 /// and are only reached through it. Mappings live in <c>Configurations/</c> (ADR-012).
 /// </summary>
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IUnitOfWork
 {
     /// <summary>
     /// Optimistic concurrency token (shadow property) of every aggregate root.
