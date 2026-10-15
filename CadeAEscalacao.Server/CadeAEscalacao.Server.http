@@ -1,12 +1,5 @@
 @host = http://localhost:5085
 
-# Teste manual da API (etapa 6): fluxo completo, do cadastro ao ranking.
-# Rode as requisições EM ORDEM (cada uma usa o ID das respostas anteriores).
-# Atenção: grava no banco de dev (Supabase). Cada execução cria um grupo novo.
-#
-# Cenário: formato 2 + 0 (4 vagas); Marcelo (presidente) e João são mensalistas e
-# formam uma dupla; Pedro e Lucas são suplentes. Marcelo é o primeiro do rodízio.
-
 ### 1. Cadastrar o presidente
 # @name president
 POST {{host}}/api/players
