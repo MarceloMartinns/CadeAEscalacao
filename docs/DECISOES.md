@@ -310,6 +310,32 @@ A etapa 5 persiste o domínio (ADR-010) no PostgreSQL do Supabase (ADR-003). O D
 
 ---
 
+## ADR-013 — API com Minimal APIs organizadas por funcionalidade
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+A etapa 6 expõe os casos de uso por HTTP. O template do Visual Studio veio com Controllers (`AddControllers`, `WeatherForecastController`), que é o estilo que o desenvolvedor sempre usou. O projeto tem objetivo de estudo e a `Application` é organizada por funcionalidade (*vertical slices*, ADR-001). Nesta etapa são poucos endpoints: lista semanal, escalação, resultado e ranking.
+
+**Decisão**
+- Endpoints com **Minimal APIs**.
+- Convenção de organização, para não acumular tudo no `Program.cs`: uma pasta por funcionalidade no `Server` (`Endpoints/Lists`, `Endpoints/Lineups`, `Endpoints/Matches`, `Endpoints/Rankings`), cada uma com um método de extensão `MapXxxEndpoints()` que cria um `MapGroup` (ex.: `/api/lists`) e registra as rotas dela. O `Program.cs` só chama esses métodos.
+- Respostas com **`TypedResults`** (`Results<Ok<T>, NotFound>`), que já descrevem os códigos de resposta no documento OpenAPI.
+- Validação de entrada com a validação nativa do .NET 10 (`AddValidation()`, DataAnnotations nos DTOs de requisição), que devolve 400 com ProblemDetails.
+- Erros convertidos em ProblemDetails por um `IExceptionHandler` global: `DomainException` → 422 (ADR-011) e `DbUpdateConcurrencyException` → 409 (ADR-012).
+
+**Alternativas**
+- Controllers — mais familiares para o desenvolvedor e ainda comuns em projetos de empresa, com estrutura imposta pelo framework (`[ApiController]`, atributos de rota, validação automática). Descartado: mais cerimônia (`[ProducesResponseType]` em cada ação) e menos alinhado aos vertical slices e ao objetivo de estudar a abordagem que a Microsoft recomenda para projetos novos.
+
+**Consequências**
+- ✅ Cada funcionalidade fica num lugar só, com pouco código repetitivo.
+- ✅ OpenAPI correto sem anotações extras, graças aos `TypedResults`.
+- ⚠️ O framework não impõe estrutura: a convenção acima precisa ser seguida à mão.
+- ⚠️ A validação embutida só existe a partir do .NET 10; exemplos antigos da internet usam filtros ou FluentValidation.
+- ⚠️ Curva de aprendizado para quem vem de Controllers.
+
+---
+
 ## Modelo
 
 ```markdown
