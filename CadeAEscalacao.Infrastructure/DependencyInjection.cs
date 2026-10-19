@@ -1,5 +1,8 @@
 using CadeAEscalacao.Application.Abstractions;
+using CadeAEscalacao.Infrastructure.Email;
+using CadeAEscalacao.Infrastructure.Identity;
 using CadeAEscalacao.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +24,28 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention());
+
+        // Login (ADR-014): Identity tables in their own context, same database.
+        services.AddDbContext<AuthDbContext>(options => options
+            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable(AuthDbContext.MigrationsHistoryTable))
+            .UseSnakeCaseNamingConvention());
+
+        services.AddIdentityCore<AppUser>(options =>
+            {
+                // The user name is the e-mail, already validated by the API.
+                options.User.AllowedUserNameCharacters = string.Empty;
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedEmail = true;
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            })
+            .AddEntityFrameworkStores<AuthDbContext>()
+            // Only the 6-digit e-mail code is used (ADR-014).
+            .AddTokenProvider<EmailTokenProvider<AppUser>>(TokenOptions.DefaultEmailProvider);
+
+        // Development only: writes the e-mail to the console. A real provider comes in etapa 10.
+        services.AddSingleton<IEmailSender, ConsoleEmailSender>();
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IPlayerRepository, PlayerRepository>();

@@ -10,8 +10,7 @@ public sealed record CreateGroupRequest(
     [Required, StringLength(100)] string Name,
     [Range(1, 11)] int PlayersPerTeam,
     [Range(0, 11)] int BenchPlayersPerTeam,
-    [Required] DayOfWeek? MatchDay,
-    Guid PresidentId);
+    [Required] DayOfWeek? MatchDay);
 
 public sealed record AddMemberRequest(Guid PlayerId, [EnumDataType(typeof(PlayerType))] PlayerType Type);
 
@@ -27,7 +26,7 @@ public static class GroupEndpoints
             .WithTags("Groups")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
-        groups.MapPost("/", CreateAsync).WithSummary("Creates a group with the president as its first regular member.");
+        groups.MapPost("/", CreateAsync).WithSummary("Creates a group. The signed-in player is the president and its first regular member.");
         groups.MapGet("/{id:guid}", GetAsync).WithSummary("Gets a group with its members, pairs and coach rotation.");
         groups.MapPost("/{id:guid}/members", AddMemberAsync).WithSummary("Adds a regular or substitute member.");
         groups.MapPost("/{id:guid}/pairs", CreatePairAsync).WithSummary("Creates a pair of members.");
@@ -44,7 +43,6 @@ public static class GroupEndpoints
             request.Name,
             new MatchFormat(request.PlayersPerTeam, request.BenchPlayersPerTeam),
             request.MatchDay!.Value,
-            new PlayerId(request.PresidentId),
             cancellationToken);
         return TypedResults.Created($"/api/groups/{group.Id}", group);
     }

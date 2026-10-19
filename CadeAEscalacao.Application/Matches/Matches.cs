@@ -26,11 +26,13 @@ public sealed record MatchResponse(
         match.TeamB.Select(playerId => playerId.Value).ToList());
 }
 
-/// <summary>Records the score of a match played with a completed lineup.</summary>
+/// <summary>The coach of the week or the president records the score of a match played with a completed lineup.</summary>
 public sealed class RecordMatch(
     ILineupRepository lineups,
     IWeeklyListRepository lists,
+    IGroupRepository groups,
     IMatchRepository matches,
+    ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
     public async Task<MatchResponse> HandleAsync(
@@ -38,6 +40,9 @@ public sealed class RecordMatch(
     {
         var lineup = await lineups.GetByIdAsync(lineupId, cancellationToken)
             ?? throw new NotFoundException("Lineup", lineupId);
+        var group = await groups.GetByIdAsync(lineup.GroupId, cancellationToken)
+            ?? throw new NotFoundException("Group", lineup.GroupId);
+        Roles.EnsureCoachOrPresident(lineup, group, currentUser.PlayerId);
         if (await matches.ExistsForLineupAsync(lineupId, cancellationToken))
         {
             throw new ConflictException("The match of this lineup was already recorded.");
@@ -53,20 +58,34 @@ public sealed class RecordMatch(
     }
 }
 
-public sealed class GetMatch(IMatchRepository matches)
+public sealed class GetMatch(IMatchRepository matches, IGroupRepository groups, ICurrentUser currentUser)
 {
-    /// <summary>The match, or null if not found.</summary>
-    public async Task<MatchResponse?> HandleAsync(MatchId id, CancellationToken cancellationToken = default) =>
-        await matches.GetByIdAsync(id, cancellationToken) is { } match ? MatchResponse.From(match) : null;
+    /// <summary>The match, or null if not found. Only members of the group can see it.</summary>
+    public async Task<MatchResponse?> HandleAsync(MatchId id, CancellationToken cancellationToken = default)
+    {
+        if (await matches.GetByIdAsync(id, cancellationToken) is not { } match)
+        {
+            return null;
+        }
+
+        var group = await groups.GetByIdAsync(match.GroupId, cancellationToken)
+            ?? throw new NotFoundException("Group", match.GroupId);
+        Roles.EnsureMember(group, currentUser.PlayerId);
+        return MatchResponse.From(match);
+    }
 }
 
-/// <summary>Fixes a score that was recorded wrong.</summary>
-public sealed class CorrectScore(IMatchRepository matches, IUnitOfWork unitOfWork)
+/// <summary>The president fixes a score that was recorded wrong.</summary>
+public sealed class CorrectScore(
+    IMatchRepository matches, IGroupRepository groups, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<MatchResponse> HandleAsync(
         MatchId id, int goalsA, int goalsB, CancellationToken cancellationToken = default)
     {
         var match = await matches.GetByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Match", id);
+        var group = await groups.GetByIdAsync(match.GroupId, cancellationToken)
+            ?? throw new NotFoundException("Group", match.GroupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
 
         match.CorrectScore(goalsA, goalsB);
         await unitOfWork.SaveChangesAsync(cancellationToken);

@@ -1,154 +1,297 @@
 @host = http://localhost:5085
+@run = 1
+@codeMarcelo = 000000
+@codeJoao = 000000
+@codePedro = 000000
+@codeLucas = 000000
 
-### 1. Cadastrar o presidente
-# @name president
-POST {{host}}/api/players
+### 1a. Marcelo pede o código (o e-mail aparece no console da API)
+# Copie o código de 6 dígitos do console para @codeMarcelo, no topo do arquivo.
+# Para rodar o fluxo de novo do zero, troque @run (cada rodada usa e-mails novos).
+POST {{host}}/api/auth/email/start
+Content-Type: application/json
+
+{ "email": "marcelo.{{run}}@example.com" }
+
+### 1b. Marcelo confirma o código e recebe os tokens
+# @name loginMarcelo
+POST {{host}}/api/auth/email/verify
+Content-Type: application/json
+
+{ "email": "marcelo.{{run}}@example.com", "code": "{{codeMarcelo}}" }
+
+### 1c. Marcelo cria o perfil (devolve um token novo, já com o player_id)
+# @name marcelo
+POST {{host}}/api/me
+Authorization: Bearer {{loginMarcelo.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "name": "Marcelo" }
 
-### 2. Cadastrar mais três jogadores
+### 2a. João pede o código
+POST {{host}}/api/auth/email/start
+Content-Type: application/json
+
+{ "email": "joao.{{run}}@example.com" }
+
+### 2b. João confirma o código
+# @name loginJoao
+POST {{host}}/api/auth/email/verify
+Content-Type: application/json
+
+{ "email": "joao.{{run}}@example.com", "code": "{{codeJoao}}" }
+
+### 2c. João cria o perfil
 # @name joao
-POST {{host}}/api/players
+POST {{host}}/api/me
+Authorization: Bearer {{loginJoao.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "name": "João" }
 
-###
+### 3a. Pedro pede o código
+POST {{host}}/api/auth/email/start
+Content-Type: application/json
+
+{ "email": "pedro.{{run}}@example.com" }
+
+### 3b. Pedro confirma o código
+# @name loginPedro
+POST {{host}}/api/auth/email/verify
+Content-Type: application/json
+
+{ "email": "pedro.{{run}}@example.com", "code": "{{codePedro}}" }
+
+### 3c. Pedro cria o perfil
 # @name pedro
-POST {{host}}/api/players
+POST {{host}}/api/me
+Authorization: Bearer {{loginPedro.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "name": "Pedro" }
 
-###
+### 4a. Lucas pede o código
+# O login aceita 10 requisições por minuto: se vier 429, espere um minuto.
+POST {{host}}/api/auth/email/start
+Content-Type: application/json
+
+{ "email": "lucas.{{run}}@example.com" }
+
+### 4b. Lucas confirma o código
+# @name loginLucas
+POST {{host}}/api/auth/email/verify
+Content-Type: application/json
+
+{ "email": "lucas.{{run}}@example.com", "code": "{{codeLucas}}" }
+
+### 4c. Lucas cria o perfil
 # @name lucas
-POST {{host}}/api/players
+POST {{host}}/api/me
+Authorization: Bearer {{loginLucas.response.body.$.accessToken}}
 Content-Type: application/json
 
 { "name": "Lucas" }
 
-### 3. Criar o grupo (o presidente entra como mensalista e no rodízio)
+### 5. Marcelo vê o próprio perfil
+GET {{host}}/api/me
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
+
+### 6. Marcelo cria o grupo e vira o presidente (entra como mensalista e no rodízio)
 # @name group
 POST {{host}}/api/groups
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "name": "Teste manual", "playersPerTeam": 2, "benchPlayersPerTeam": 0, "matchDay": "Tuesday", "presidentId": "{{president.response.body.$.id}}" }
+{ "name": "Teste manual", "playersPerTeam": 2, "benchPlayersPerTeam": 0, "matchDay": "Tuesday" }
 
-### 4. Adicionar membros
+### 7. O presidente adiciona os membros
 POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{joao.response.body.$.id}}", "type": "Regular" }
+{ "playerId": "{{joao.response.body.$.player.id}}", "type": "Regular" }
 
 ###
 POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{pedro.response.body.$.id}}", "type": "Substitute" }
+{ "playerId": "{{pedro.response.body.$.player.id}}", "type": "Substitute" }
 
 ###
 POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{lucas.response.body.$.id}}", "type": "Substitute" }
+{ "playerId": "{{lucas.response.body.$.player.id}}", "type": "Substitute" }
 
-### 5. Criar a dupla Marcelo + João
+### 8. O presidente cria a dupla Marcelo + João
 POST {{host}}/api/groups/{{group.response.body.$.id}}/pairs
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "firstPlayerId": "{{president.response.body.$.id}}", "secondPlayerId": "{{joao.response.body.$.id}}" }
+{ "firstPlayerId": "{{marcelo.response.body.$.player.id}}", "secondPlayerId": "{{joao.response.body.$.player.id}}" }
 
-### 6. Criar a temporada (6 meses)
+### 9. O presidente cria a temporada (6 meses)
 # @name season
 POST {{host}}/api/groups/{{group.response.body.$.id}}/seasons
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
 { "name": "2026/2", "start": "2026-07-01" }
 
-### 7. Abrir a lista (mensalistas aparecem em "pending")
+### 10. O presidente abre a lista (mensalistas aparecem em "pending")
 # @name list
 POST {{host}}/api/groups/{{group.response.body.$.id}}/lists
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
 { "matchDate": "2026-10-20" }
 
-### 8. Todos confirmam presença
+### 11. Cada um confirma a própria presença
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{president.response.body.$.id}}", "positions": ["Defender"] }
+{ "positions": ["Defender"] }
 
 ###
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{joao.response.body.$.id}}", "positions": ["Midfielder", "Forward"] }
+{ "positions": ["Midfielder", "Forward"] }
 
 ###
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{pedro.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{pedro.response.body.$.id}}", "positions": ["Goalkeeper"] }
+{ "positions": ["Goalkeeper"] }
 
 ###
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{lucas.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{lucas.response.body.$.id}}", "positions": ["Forward"] }
+{ "positions": ["Forward"] }
 
-### 9. Ver a lista (4 em "playing", 0 vagas abertas)
+### 12. Lucas muda a própria posição
+PUT {{host}}/api/lists/{{list.response.body.$.id}}/entries/me
+Authorization: Bearer {{lucas.response.body.$.token.accessToken}}
+Content-Type: application/json
+
+{ "positions": ["Forward", "Midfielder"] }
+
+### 13. Pedro vê a lista (4 em "playing", 0 vagas abertas)
 GET {{host}}/api/lists/{{list.response.body.$.id}}
+Authorization: Bearer {{pedro.response.body.$.token.accessToken}}
 
-### 10. Fechar a lista
+### 14. O presidente fecha a lista
 POST {{host}}/api/lists/{{list.response.body.$.id}}/close
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 
-### 11. Iniciar a escalação (professor: Marcelo; parceiro: João)
+### 15. O presidente inicia a escalação (professor: Marcelo; parceiro: João)
 # @name lineup
 POST {{host}}/api/lists/{{list.response.body.$.id}}/lineup
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 
-### 12. O professor divide os outros jogadores
+### 16. O professor da vez (Marcelo) divide os outros jogadores
 PUT {{host}}/api/lineups/{{lineup.response.body.$.id}}/teams
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "teamA": ["{{pedro.response.body.$.id}}"], "teamB": ["{{lucas.response.body.$.id}}"] }
+{ "teamA": ["{{pedro.response.body.$.player.id}}"], "teamB": ["{{lucas.response.body.$.player.id}}"] }
 
-### 13. O parceiro escolhe o time A (o professor vai para o B)
+### 17. A dupla do professor (João) escolhe o time A; o professor vai para o B
 POST {{host}}/api/lineups/{{lineup.response.body.$.id}}/choice
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
 Content-Type: application/json
 
 { "team": "A" }
 
-### 14. Registrar o resultado (time A venceu)
+### 18. O professor registra o resultado (time A venceu)
 # @name match
 POST {{host}}/api/lineups/{{lineup.response.body.$.id}}/match
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
 { "goalsA": 3, "goalsB": 1 }
 
-### 15. Ranking (João e Pedro em 1º com 3 pontos)
+### 19. Ranking (João e Pedro em 1º com 3 pontos)
 GET {{host}}/api/seasons/{{season.response.body.$.id}}/ranking
+Authorization: Bearer {{lucas.response.body.$.token.accessToken}}
 
-### 16. Grupo: Marcelo foi para o fim do rodízio
+### 20. Grupo: Marcelo foi para o fim do rodízio
 GET {{host}}/api/groups/{{group.response.body.$.id}}
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
+
+### 21. Renovar a sessão do Marcelo (o refresh token antigo deixa de valer)
+# @name refreshMarcelo
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{loginMarcelo.response.body.$.refreshToken}}" }
+
+### 22. Sair (logout): o refresh token novo é revogado
+POST {{host}}/api/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{refreshMarcelo.response.body.$.refreshToken}}" }
+
+### Erros: sem token → 401
+GET {{host}}/api/groups/{{group.response.body.$.id}}
+
+### Erros: logado, mas sem perfil (token do login, sem player_id) → 403 "Profile required"
+GET {{host}}/api/groups/{{group.response.body.$.id}}
+Authorization: Bearer {{loginPedro.response.body.$.accessToken}}
+
+### Erros: quem não é o professor da vez tenta montar os times → 403
+PUT {{host}}/api/lineups/{{lineup.response.body.$.id}}/teams
+Authorization: Bearer {{pedro.response.body.$.token.accessToken}}
+Content-Type: application/json
+
+{ "teamA": ["{{pedro.response.body.$.player.id}}"], "teamB": ["{{lucas.response.body.$.player.id}}"] }
+
+### Erros: quem não é o presidente tenta corrigir o placar → 403
+PUT {{host}}/api/matches/{{match.response.body.$.id}}/score
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
+Content-Type: application/json
+
+{ "goalsA": 0, "goalsB": 1 }
+
+### Erros: refresh token já usado → 401 (e todos os tokens do Marcelo são revogados)
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{loginMarcelo.response.body.$.refreshToken}}" }
+
+### Erros: código errado → 400 "Invalid code"
+POST {{host}}/api/auth/email/verify
+Content-Type: application/json
+
+{ "email": "pedro.{{run}}@example.com", "code": "123456" }
 
 ### Erros: abrir de novo a lista da mesma data → 409
 POST {{host}}/api/groups/{{group.response.body.$.id}}/lists
+Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
 { "matchDate": "2026-10-20" }
 
 ### Erros: inscrição sem posição → 400 com "errors"
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{pedro.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{pedro.response.body.$.id}}", "positions": [] }
+{ "positions": [] }
 
-### Erros: inscrever na lista fechada → 422
+### Erros: confirmar presença na lista fechada → 422
 POST {{host}}/api/lists/{{list.response.body.$.id}}/entries
+Authorization: Bearer {{pedro.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{pedro.response.body.$.id}}", "positions": ["Forward"] }
+{ "positions": ["Forward"] }
 
 ### Documento OpenAPI
 GET {{host}}/openapi/v1.json

@@ -15,6 +15,7 @@ public sealed class ListEndpointsTests : ApiTestBase
     [Test]
     public async Task OpenList_ValidRequest_Returns201WithRegularsPending()
     {
+        SignInAs(_team.President);
         Api.Groups.Returns(_team.Group);
 
         var response = await PostAsync($"/api/groups/{_team.Group.Id}/lists", new { matchDate = TestGroup.MatchDate });
@@ -29,8 +30,23 @@ public sealed class ListEndpointsTests : ApiTestBase
     }
 
     [Test]
+    public async Task OpenList_NotThePresident_Returns403()
+    {
+        SignInAs(_team.Regular);
+        Api.Groups.Returns(_team.Group);
+
+        var response = await PostAsync($"/api/groups/{_team.Group.Id}/lists", new { matchDate = TestGroup.MatchDate });
+
+        var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        problem.Detail.ShouldBe("Only the president of the group can do this.");
+        Api.Lists.DidNotReceive().Add(Arg.Any<WeeklyList>());
+    }
+
+    [Test]
     public async Task OpenList_GroupNotFound_Returns404()
     {
+        SignInAs(_team.President);
+
         var response = await PostAsync($"/api/groups/{Guid.NewGuid()}/lists", new { matchDate = TestGroup.MatchDate });
 
         var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
@@ -40,6 +56,7 @@ public sealed class ListEndpointsTests : ApiTestBase
     [Test]
     public async Task OpenList_ListExistsForDate_Returns409()
     {
+        SignInAs(_team.President);
         Api.Groups.Returns(_team.Group);
         Api.Lists.ExistsAsync(_team.Group.Id, TestGroup.MatchDate, Arg.Any<CancellationToken>()).Returns(true);
 
@@ -52,6 +69,8 @@ public sealed class ListEndpointsTests : ApiTestBase
     [Test]
     public async Task OpenList_MissingDate_Returns400WithValidationErrors()
     {
+        SignInAs(_team.President);
+
         var response = await PostAsync($"/api/groups/{_team.Group.Id}/lists", new { });
 
         var problem = await ReadAsync<HttpValidationProblemDetails>(response, HttpStatusCode.BadRequest);
@@ -59,11 +78,45 @@ public sealed class ListEndpointsTests : ApiTestBase
     }
 
     [Test]
-    public async Task GetList_NotFound_Returns404()
+    public async Task GetList_WithoutToken_Returns401()
     {
         var response = await Client.GetAsync($"/api/lists/{Guid.NewGuid()}");
 
+        await ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task GetList_SignedInWithoutPlayer_Returns403AskingForTheProfile()
+    {
+        SignInAs(playerId: null);
+
+        var response = await Client.GetAsync($"/api/lists/{Guid.NewGuid()}");
+
+        var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        problem.Title.ShouldBe("Profile required");
+    }
+
+    [Test]
+    public async Task GetList_NotFound_Returns404()
+    {
+        SignInAs(_team.President);
+
+        var response = await Client.GetAsync($"/api/lists/{Guid.NewGuid()}");
+
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task GetList_NotAMember_Returns403()
+    {
+        var list = _team.OpenList();
+        Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Outsider);
+
+        var response = await Client.GetAsync($"/api/lists/{list.Id}");
+
+        await ReadProblemAsync(response, HttpStatusCode.Forbidden);
     }
 
     [Test]
@@ -74,6 +127,8 @@ public sealed class ListEndpointsTests : ApiTestBase
         list.SignUp(_team.Group, _team.Substitute2, Position.Forward);
         list.SignUp(_team.Group, _team.Substitute3, Position.Forward);
         Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Substitute3);
 
         var response = await Client.GetAsync($"/api/lists/{list.Id}");
 
@@ -90,10 +145,10 @@ public sealed class ListEndpointsTests : ApiTestBase
         var list = _team.OpenList();
         Api.Lists.Returns(list);
         Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Substitute1);
 
         var response = await PostAsync(
-            $"/api/lists/{list.Id}/entries",
-            new { playerId = _team.Substitute1.Value, positions = new[] { "Midfielder", "Forward" } });
+            $"/api/lists/{list.Id}/entries", new { positions = new[] { "Midfielder", "Forward" } });
 
         var body = await ReadAsync<WeeklyListResponse>(response, HttpStatusCode.OK);
         var entry = body.Playing.Single();
@@ -103,27 +158,27 @@ public sealed class ListEndpointsTests : ApiTestBase
     }
 
     [Test]
-    public async Task SignUp_NotAMember_Returns422()
+    public async Task SignUp_NotAMember_Returns403()
     {
         var list = _team.OpenList();
         Api.Lists.Returns(list);
         Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Outsider);
 
-        var response = await PostAsync(
-            $"/api/lists/{list.Id}/entries",
-            new { playerId = Guid.NewGuid(), positions = new[] { "Defender" } });
+        var response = await PostAsync($"/api/lists/{list.Id}/entries", new { positions = new[] { "Defender" } });
 
-        var problem = await ReadProblemAsync(response, HttpStatusCode.UnprocessableEntity);
-        problem.Detail.ShouldBe("The player is not a member of this group.");
+        var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        problem.Detail.ShouldBe("Only members of the group can do this.");
         await Api.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Test]
     public async Task SignUp_NoPositions_Returns400WithValidationErrors()
     {
+        SignInAs(_team.Substitute1);
+
         var response = await PostAsync(
-            $"/api/lists/{Guid.NewGuid()}/entries",
-            new { playerId = _team.Substitute1.Value, positions = Array.Empty<string>() });
+            $"/api/lists/{Guid.NewGuid()}/entries", new { positions = Array.Empty<string>() });
 
         var problem = await ReadAsync<HttpValidationProblemDetails>(response, HttpStatusCode.BadRequest);
         problem.Errors.Keys.ShouldContain(key => key.Contains("Positions", StringComparison.OrdinalIgnoreCase));
@@ -136,13 +191,27 @@ public sealed class ListEndpointsTests : ApiTestBase
         Api.Lists.Returns(list);
         Api.Groups.Returns(_team.Group);
         Api.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new DbUpdateConcurrencyException());
+        SignInAs(_team.Substitute1);
 
-        var response = await PostAsync(
-            $"/api/lists/{list.Id}/entries",
-            new { playerId = _team.Substitute1.Value, positions = new[] { "Goalkeeper" } });
+        var response = await PostAsync($"/api/lists/{list.Id}/entries", new { positions = new[] { "Goalkeeper" } });
 
         var problem = await ReadProblemAsync(response, HttpStatusCode.Conflict);
         problem.Title.ShouldBe("Concurrent update");
+    }
+
+    [Test]
+    public async Task ChangePositions_SignedInPlayer_ChangesOnlyTheirEntry()
+    {
+        var list = _team.OpenList();
+        list.SignUp(_team.Group, _team.Substitute1, Position.Forward);
+        Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Substitute1);
+
+        var response = await PutAsync($"/api/lists/{list.Id}/entries/me", new { positions = new[] { "Goalkeeper" } });
+
+        var body = await ReadAsync<WeeklyListResponse>(response, HttpStatusCode.OK);
+        body.Playing.Single().Positions.ShouldBe([Position.Goalkeeper]);
     }
 
     [Test]
@@ -150,8 +219,10 @@ public sealed class ListEndpointsTests : ApiTestBase
     {
         var list = _team.OpenList();
         Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Regular);
 
-        var response = await Client.DeleteAsync($"/api/lists/{list.Id}/entries/{_team.Regular}");
+        var response = await Client.DeleteAsync($"/api/lists/{list.Id}/entries/me");
 
         var body = await ReadAsync<WeeklyListResponse>(response, HttpStatusCode.OK);
         body.Declined.Single().PlayerId.ShouldBe(_team.Regular.Value);
@@ -164,6 +235,8 @@ public sealed class ListEndpointsTests : ApiTestBase
         var list = _team.OpenList();
         list.SignUp(_team.Group, _team.President, Position.Defender);
         Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.President);
 
         var response = await PostAsync($"/api/lists/{list.Id}/close");
 
@@ -173,11 +246,28 @@ public sealed class ListEndpointsTests : ApiTestBase
     }
 
     [Test]
+    public async Task Close_NotThePresident_Returns403()
+    {
+        var list = _team.OpenList();
+        Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.Substitute1);
+
+        var response = await PostAsync($"/api/lists/{list.Id}/close");
+
+        await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        list.Status.ShouldBe(WeeklyListStatus.Open);
+        await Api.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Test]
     public async Task Cancel_AlreadyCancelled_Returns422()
     {
         var list = _team.OpenList();
         list.Cancel();
         Api.Lists.Returns(list);
+        Api.Groups.Returns(_team.Group);
+        SignInAs(_team.President);
 
         var response = await PostAsync($"/api/lists/{list.Id}/cancel");
 
