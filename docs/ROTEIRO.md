@@ -104,7 +104,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 - [x] Papéis: presidente, professor, jogador — calculados a partir do grupo e da escalação (ADR-016)
 - [x] Regras de autorização (ex.: só o professor da vez publica a escalação) e quem age vem do token (ADR-017)
 - [x] Testes de API com usuários autenticados (tokens de teste, login com e-mail falso)
-- [ ] Aplicar a migration `AddIdentity` no banco de dev (`--context AuthDbContext`)
+- [x] Migration `AddIdentity` aplicada no banco de dev (`--context AuthDbContext`)
 
 **Estudo:** ASP.NET Core Identity, JWT, refresh token, OAuth, autorização baseada em políticas, rate limiting.
 
