@@ -36,6 +36,9 @@ internal sealed class TestGroup
 
     public PlayerId Substitute3 { get; } = PlayerId.New();
 
+    /// <summary>A player who is not a member of the group.</summary>
+    public PlayerId Outsider { get; } = PlayerId.New();
+
     public WeeklyList OpenList() => WeeklyList.Open(Group, MatchDate);
 
     /// <summary>Both regulars and two substitutes confirmed (the list is full), then closed.</summary>

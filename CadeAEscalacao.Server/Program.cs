@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using CadeAEscalacao.Application;
 using CadeAEscalacao.Infrastructure;
+using CadeAEscalacao.Server.Authentication;
 using CadeAEscalacao.Server.Endpoints;
 using CadeAEscalacao.Server.ErrorHandling;
 
@@ -8,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Login with the API's own tokens (ADR-014, ADR-015).
+builder.Services.AddApiAuthentication();
 
 // Errors as Problem Details: known exceptions (ADR-011/012/013), validation and empty error responses.
 builder.Services.AddProblemDetails();
@@ -35,6 +39,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapApiEndpoints();
 

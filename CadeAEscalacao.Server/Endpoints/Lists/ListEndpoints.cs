@@ -10,13 +10,13 @@ namespace CadeAEscalacao.Server.Endpoints.Lists;
 
 public sealed record OpenListRequest([Required] DateOnly? MatchDate);
 
-public sealed record SignUpRequest(Guid PlayerId, [Required, MinLength(1)] IReadOnlyList<Position> Positions);
+public sealed record SignUpRequest([Required, MinLength(1)] IReadOnlyList<Position> Positions);
 
 public sealed record ChangePositionsRequest([Required, MinLength(1)] IReadOnlyList<Position> Positions);
 
 /// <summary>
-/// Weekly list ("lista semanal"). Until authentication (etapa 7), the player who acts
-/// comes in the route or in the body.
+/// Weekly list ("lista semanal"). The player who signs up, changes positions or leaves is the
+/// signed-in one (ADR-017); opening, closing and cancelling are for the president (ADR-016).
 /// </summary>
 public static class ListEndpoints
 {
@@ -33,11 +33,11 @@ public static class ListEndpoints
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         lists.MapGet("/{id:guid}", GetAsync).WithSummary("Gets the list with who plays, who is pending and who is waiting.");
-        lists.MapPost("/{id:guid}/entries", SignUpAsync).WithSummary("A member confirms presence.");
-        lists.MapPut("/{id:guid}/entries/{playerId:guid}", ChangePositionsAsync)
-            .WithSummary("A confirmed player changes their positions.");
-        lists.MapDelete("/{id:guid}/entries/{playerId:guid}", WithdrawAsync)
-            .WithSummary("The player declines or leaves the list.");
+        lists.MapPost("/{id:guid}/entries", SignUpAsync).WithSummary("The signed-in member confirms presence.");
+        lists.MapPut("/{id:guid}/entries/me", ChangePositionsAsync)
+            .WithSummary("The signed-in player changes their positions.");
+        lists.MapDelete("/{id:guid}/entries/me", WithdrawAsync)
+            .WithSummary("The signed-in player declines or leaves the list.");
         lists.MapPost("/{id:guid}/close", CloseAsync).WithSummary("Closes the list. Pending regulars lose their spot.");
         lists.MapPost("/{id:guid}/cancel", CancelAsync).WithSummary("Cancels the match.");
 
@@ -60,20 +60,19 @@ public static class ListEndpoints
     private static async Task<Ok<WeeklyListResponse>> SignUpAsync(
         Guid id, SignUpRequest request, SignUpForList signUp, CancellationToken cancellationToken) =>
         TypedResults.Ok(await signUp.HandleAsync(
-            new WeeklyListId(id), new PlayerId(request.PlayerId), Positions.Combine(request.Positions), cancellationToken));
+            new WeeklyListId(id), Positions.Combine(request.Positions), cancellationToken));
 
     private static async Task<Ok<WeeklyListResponse>> ChangePositionsAsync(
         Guid id,
-        Guid playerId,
         ChangePositionsRequest request,
         ChangeListPositions changePositions,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await changePositions.HandleAsync(
-            new WeeklyListId(id), new PlayerId(playerId), Positions.Combine(request.Positions), cancellationToken));
+            new WeeklyListId(id), Positions.Combine(request.Positions), cancellationToken));
 
     private static async Task<Ok<WeeklyListResponse>> WithdrawAsync(
-        Guid id, Guid playerId, WithdrawFromList withdraw, CancellationToken cancellationToken) =>
-        TypedResults.Ok(await withdraw.HandleAsync(new WeeklyListId(id), new PlayerId(playerId), cancellationToken));
+        Guid id, WithdrawFromList withdraw, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await withdraw.HandleAsync(new WeeklyListId(id), cancellationToken));
 
     private static async Task<Ok<WeeklyListResponse>> CloseAsync(
         Guid id, CloseWeeklyList closeList, CancellationToken cancellationToken) =>

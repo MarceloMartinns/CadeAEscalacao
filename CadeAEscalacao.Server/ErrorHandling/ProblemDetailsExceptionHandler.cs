@@ -7,7 +7,7 @@ using Npgsql;
 namespace CadeAEscalacao.Server.ErrorHandling;
 
 /// <summary>
-/// Turns the known exceptions into Problem Details (RFC 9457), as decided in ADR-011, ADR-012 and ADR-013.
+/// Turns the known exceptions into Problem Details (RFC 9457), as decided in ADR-011, ADR-012, ADR-013 and ADR-016.
 /// Any other exception is left to the default handler (500, without details outside development).
 /// </summary>
 internal sealed class ProblemDetailsExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
@@ -21,6 +21,7 @@ internal sealed class ProblemDetailsExceptionHandler(IProblemDetailsService prob
             // framework answers 400 by itself; in development it throws so the error is visible.
             BadHttpRequestException badRequest => (badRequest.StatusCode, "Bad request", exception.Message),
             NotFoundException => (StatusCodes.Status404NotFound, "Not found", exception.Message),
+            ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,

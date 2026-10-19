@@ -60,7 +60,7 @@ Solution criada com o template **"React and ASP.NET Core" (TypeScript)** do Visu
 
 ## ADR-003 — Supabase como PostgreSQL + autenticação
 
-**Status:** Aceita · **Data:** 2026-09-27
+**Status:** Aceita, com a parte de autenticação substituída pela ADR-014 · **Data:** 2026-09-27
 
 **Decisão**
 - **Banco:** acessado pela API via EF Core + Npgsql (connection string do Supabase, usando o *pooler*). O React **não** acessa o banco direto — toda regra passa pela API.
@@ -333,6 +333,134 @@ A etapa 6 expõe os casos de uso por HTTP. O template do Visual Studio veio com 
 - ⚠️ O framework não impõe estrutura: a convenção acima precisa ser seguida à mão.
 - ⚠️ A validação embutida só existe a partir do .NET 10; exemplos antigos da internet usam filtros ou FluentValidation.
 - ⚠️ Curva de aprendizado para quem vem de Controllers.
+
+---
+
+## ADR-014 — Login feito pela própria API, com ASP.NET Core Identity e sem senha
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+A ADR-003 previa o Supabase Auth: o React faria o login no Supabase e a API só validaria o token. Na etapa 7 ficou claro que isso prende o projeto ao Supabase: trocar de banco ou de hospedagem obrigaria a trocar também o login e a religar a conta de cada pessoa. A pelada tem poucas dezenas de pessoas, que entram pelo celular, e o objetivo de estudo inclui autenticação.
+
+**Decisão**
+- A **API faz o login**, com **ASP.NET Core Identity** (`AddIdentityCore`). O Supabase passa a ser só o banco (ADR-003, parte de banco, continua valendo).
+- **Sem senha:** o login é por **magic link no e-mail**. O e-mail traz um **código de 6 dígitos** e, a partir da etapa 8 (quando existir a tela de login), um link que já preenche o código. O código vale para quem abre o e-mail em outro app ou aparelho. Ele é gerado pelo provedor de token de e-mail do Identity e vale poucos minutos; depois de 5 códigos errados a conta fica bloqueada por um tempo (*lockout*).
+- **Login com Google** fica para depois (junto da etapa 8), porque exige um cliente OAuth no Google Cloud Console e termina com um redirecionamento para a tela de login. Quando entrar, usa a tabela `user_logins` do Identity.
+- **Tabelas do Identity num `AuthDbContext` separado** (`IdentityUserContext<AppUser, Guid>`, sem as tabelas de papéis, ver ADR-016), no mesmo banco e no Infrastructure: `users`, `user_logins`, `user_tokens`, `user_claims` e `refresh_tokens` (ADR-015). O `AppDbContext` continua só com o domínio.
+- **Ligação com o domínio:** `users.player_id` (opcional, único, com chave estrangeira para `players`, escrita à mão na migration). O domínio não conhece o usuário.
+- **Cadastro:** o primeiro código válido cria o usuário, já com o e-mail confirmado. Depois, `POST /api/me` com o nome cria o `Player` e o liga ao usuário. O presidente adiciona ao grupo quem já se cadastrou; convite para quem ainda não tem conta fica para depois.
+- **E-mail** atrás de uma abstração `IEmailSender`. Em desenvolvimento, a implementação só escreve o e-mail no console da API. O provedor real (Resend, Brevo ou SMTP) entra na etapa 10.
+- **Proteção:** limite de requisições (`AddRateLimiter`) nos endpoints `/api/auth`, e o pedido de código sempre responde **202**, sem revelar se o e-mail já existe.
+
+**Alternativas**
+- Supabase Auth (ADR-003) — menos código e sem e-mail para enviar, mas prende o login ao Supabase.
+- Provedor externo trocável por OpenID Connect (Auth0, Keycloak, Entra...) — a API só valida o token, mas o login continua fora do projeto, e trocar de provedor muda o `sub` de todo mundo.
+- Login com senha — exige guardar senha, "esqueci a senha" e regras de força de senha; o magic link resolve o mesmo problema com menos risco.
+- Identity no próprio `AppDbContext` — um contexto só, mas mistura autenticação com o domínio (e com a coluna `version`) e dificulta trocar só o banco de usuários nos testes.
+
+**Consequências**
+- ✅ Login independente do banco e da hospedagem: só depende do EF Core e de um serviço de e-mail.
+- ✅ Nenhuma senha guardada.
+- ⚠️ A segurança do login passa a ser responsabilidade do projeto (códigos, bloqueio, limite de requisições).
+- ⚠️ Duas pastas de migrations (`dotnet ef ... --context AuthDbContext`).
+- ⚠️ Criar o `Player` e ligar ao usuário envolve os dois contextos, sem transação única: primeiro o `Player` é salvo, depois o usuário é ligado a ele (409 se já houver jogador ligado). Se a segunda parte falhar, sobra um `Player` sem conta e sem grupo, que não causa problema.
+- ⚠️ Em produção é preciso um serviço de e-mail (etapa 10).
+
+---
+
+## ADR-015 — Sessão com JWT próprio e refresh token
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+Depois do login (ADR-014), o React precisa provar a cada requisição quem é a pessoa. O mesmo mecanismo precisa funcionar no teste manual pelo `.http` e nos testes automatizados.
+
+**Decisão**
+- **Access token:** JWT emitido pela API, válido por **30 minutos**, com `sub` (id do usuário) e `player_id` (quando já há cadastro). Validado com `AddJwtBearer` (emissor, audiência, validade e assinatura).
+- **Assinatura HMAC (HS256)** com chave de 256 bits em User Secrets (`Jwt:SigningKey`), e em variável de ambiente na produção. Só a API emite e valida, então não é preciso chave pública.
+- **Refresh token:** valor aleatório opaco, válido por **30 dias**, trocado a cada uso (*rotation*). A tabela `refresh_tokens` guarda só o **hash**. Se um refresh token já usado aparecer de novo, todos os tokens daquele login são revogados.
+- Endpoints: `POST /api/auth/email/start`, `POST /api/auth/email/verify` (devolve `accessToken`, `expiresIn` e `refreshToken`), `POST /api/auth/refresh` e `POST /api/auth/logout`. O `POST /api/me` devolve um access token novo, já com `player_id` (o refresh token continua o mesmo; os próximos access tokens também trazem o `player_id`, porque ele é lido do banco a cada refresh).
+- Onde o React guarda os tokens é decidido na etapa 8. Dá para mover o refresh token para um cookie HttpOnly sem mudar o resto.
+
+**Alternativas**
+- Cookie de autenticação do Identity — o mais seguro para uma SPA na mesma origem (o JavaScript não lê o cookie), mas exige proteção contra CSRF e complica o teste pelo `.http`. Pode ser reavaliado na etapa 8.
+- `MapIdentityApi` — pronto, mas os tokens não são JWT e o login dele exige senha.
+- Assinatura assimétrica (ECDSA/RSA, com JWKS) — útil quando outro serviço valida o token; aqui só a API valida.
+- Só access token, sem refresh — mais simples, mas obriga a fazer login de novo a cada expiração.
+
+**Consequências**
+- ✅ Requisições sem consulta ao banco para saber quem é a pessoa (`player_id` vem no token).
+- ✅ Testes geram tokens reais com a chave de teste.
+- ⚠️ Um access token roubado vale até expirar (30 min); o logout só revoga o refresh token.
+- ⚠️ A chave de assinatura é um segredo: nunca no `appsettings.json` nem no Git.
+
+---
+
+## ADR-016 — Papéis vêm do grupo, e a autorização fica nos casos de uso
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+O roteiro prevê três papéis: presidente, professor e jogador. Eles não são da pessoa, e sim do grupo e da semana: quem é presidente no society pode ser só jogador no futsal, e o professor da vez muda toda semana pelo rodízio.
+
+**Decisão**
+- **Nenhum papel no token nem nas tabelas do Identity.** O papel é calculado a partir dos dados do domínio:
+  - **presidente** = `Group.PresidentId`;
+  - **professor da vez** = `Lineup.CoachId`;
+  - **dupla do professor** = `Lineup.PartnerId`;
+  - **jogador** = membro do grupo (`GroupMember`).
+- **No Server, por políticas:** a política padrão exige usuário autenticado em todo `/api` (sem token ou token inválido → **401**); a política `RegisteredPlayer` exige `player_id` no token (todos os endpoints, menos `/api/auth` e `/api/me`).
+- **Nos casos de uso, as regras de papel.** Eles já carregam o grupo e a escalação, então verificam o papel e lançam `ForbiddenException` (Application/Common), que a API converte em **403** com ProblemDetails.
+- Permissões:
+
+| Ação | Quem |
+|---|---|
+| Criar grupo | qualquer jogador cadastrado (vira presidente) |
+| Ver grupo, lista, escalação, partida e ranking | membros do grupo |
+| Adicionar membro, criar dupla, mudar rodízio, criar temporada | presidente |
+| Abrir, fechar e cancelar lista; iniciar escalação; escolher a dupla do dia | presidente |
+| Confirmar presença, mudar posições, sair da lista | o próprio membro |
+| Montar os times (publicar a escalação) | professor da vez |
+| Escolher o time | dupla do professor |
+| Registrar o resultado | professor da vez ou presidente |
+| Corrigir o placar | presidente |
+
+**Alternativas**
+- Papéis no token ou `IdentityRole` — não representam papel por grupo nem o professor que muda toda semana.
+- Tudo com `IAuthorizationHandler` baseado em recurso no Server — mais próximo do ASP.NET, mas carregaria cada agregado duas vezes e espalharia regra de negócio fora da Application.
+- Regras de papel no Domain (ex.: `lineup.AssignTeams(actorId, ...)`) — possível, mas mudaria várias assinaturas e testes do domínio sem ganho agora.
+
+**Consequências**
+- ✅ Regras de permissão testáveis sem HTTP, junto com o caso de uso.
+- ✅ A mesma pessoa tem papéis diferentes em grupos diferentes, sem nada extra.
+- ⚠️ Cada caso de uso novo precisa lembrar de verificar o papel; os testes de API cobrem os 403.
+
+---
+
+## ADR-017 — Quem faz a ação vem do token, não da rota nem do corpo
+
+**Status:** Aceita · **Data:** 2026-10-15
+
+**Contexto**
+Até a etapa 6, quem agia era identificado por um `playerId` na rota ou no corpo (ex.: `SignUpRequest.PlayerId`, `CreateGroupRequest.PresidentId`). Com login, isso permitiria agir em nome de outra pessoa.
+
+**Decisão**
+- A Application recebe quem age por uma abstração `ICurrentUser` (em `Abstractions/`), implementada no Server a partir do `player_id` do token.
+- O `playerId` **sai quando representa quem age**:
+  - `POST /api/lists/{id}/entries` confirma a pessoa logada (sem `playerId` no corpo);
+  - `PUT` e `DELETE /api/lists/{id}/entries/{playerId}` viram `/api/lists/{id}/entries/me`;
+  - `CreateGroupRequest.PresidentId` sai: quem cria o grupo vira o presidente;
+  - `POST /api/players` sai: o cadastro é feito por `POST /api/me`.
+- O `playerId` **fica quando representa o alvo da ação**: adicionar membro, criar dupla, rodízio, dupla do dia e montagem dos times.
+
+**Alternativas**
+- Manter o `playerId` no corpo e conferir se é igual ao do token — redundante e fácil de esquecer.
+- Passar quem age como parâmetro em cada `HandleAsync` — explícito, mas repete o mesmo parâmetro em quase todos os casos de uso.
+
+**Consequências**
+- ✅ Não dá para agir em nome de outra pessoa.
+- ⚠️ As rotas mudam; o `.http` e os testes de API são atualizados.
 
 ---
 

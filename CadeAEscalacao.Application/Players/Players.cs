@@ -3,7 +3,7 @@ using CadeAEscalacao.Domain.Players;
 
 namespace CadeAEscalacao.Application.Players;
 
-// Minimal player registration, so the API can be used before the screens (etapa 8).
+// Players. The signed-in person creates their own player with POST /api/me (ADR-014).
 
 public sealed record PlayerResponse(Guid Id, string Name)
 {

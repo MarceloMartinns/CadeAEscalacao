@@ -16,7 +16,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 | 4 | Modelagem do domínio | ✅ |
 | 5 | Banco de dados | ✅ |
 | 6 | API | ✅ |
-| 7 | Autenticação e papéis | ⬜ |
+| 7 | Autenticação e papéis | 🚧 |
 | 8 | Telas em React | ⬜ |
 | 9 | CI com GitHub Actions | ⬜ |
 | 10 | Docker e deploy | ⬜ |
@@ -94,20 +94,25 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** ASP.NET Core, injeção de dependência, vertical slices, testes de API.
 
-## 7. Autenticação e papéis ⬜
-**Objetivo:** cada pessoa entra com sua conta e só faz o que o papel permite.
+## 7. Autenticação e papéis 🚧
+**Objetivo:** cada pessoa entra com sua conta e só faz o que o papel permite (ADR-014 a ADR-017).
 
-- [ ] Supabase Auth (e-mail/magic link e Google)
-- [ ] Validação do JWT na API
-- [ ] Papéis: presidente, professor, jogador
-- [ ] Regras de autorização (ex.: só o professor da vez publica a escalação)
+- [x] Decidir: Supabase Auth ou login na própria API → login na API com ASP.NET Core Identity, sem senha (ADR-014)
+- [x] Login por código de 6 dígitos no e-mail (magic link) e sessão com JWT próprio + refresh token (ADR-015)
+- [ ] Login com Google — adiado para junto da etapa 8 (ADR-014)
+- [x] Validação do JWT na API (`AddJwtBearer`) e perfil do jogador em `/api/me`
+- [x] Papéis: presidente, professor, jogador — calculados a partir do grupo e da escalação (ADR-016)
+- [x] Regras de autorização (ex.: só o professor da vez publica a escalação) e quem age vem do token (ADR-017)
+- [x] Testes de API com usuários autenticados (tokens de teste, login com e-mail falso)
+- [x] Migration `AddIdentity` aplicada no banco de dev (`--context AuthDbContext`)
 
-**Estudo:** JWT, OAuth, autorização baseada em políticas.
+**Estudo:** ASP.NET Core Identity, JWT, refresh token, OAuth, autorização baseada em políticas, rate limiting.
 
 ## 8. Telas em React ⬜
 **Objetivo:** interface usável no celular, que é onde o grupo vive.
 
-- [ ] Login
+- [ ] Login (código por e-mail, com link que já preenche o código)
+- [ ] Login com Google (cliente OAuth no Google Cloud Console)
 - [ ] Lista semanal (confirmar/sair/suplente)
 - [ ] Tela de escalação do professor (filtro por posição)
 - [ ] Escolha de time pela dupla
@@ -131,7 +136,8 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 - [ ] `Dockerfile` multi-stage (React + .NET)
 - [ ] Deploy no Render a partir da `main`
-- [ ] Variáveis de ambiente (connection string, chaves do Supabase)
+- [ ] Variáveis de ambiente (connection string, `Jwt:SigningKey`)
+- [ ] Provedor de e-mail real para o código de login (Resend, Brevo ou SMTP)
 - [ ] Testes E2E com Playwright nos fluxos principais
 
 **Estudo:** Docker, imagens multi-stage, deploy contínuo, hospedagem gratuita.

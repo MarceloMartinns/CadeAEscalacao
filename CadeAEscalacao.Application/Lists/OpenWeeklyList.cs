@@ -6,11 +6,12 @@ using CadeAEscalacao.Domain.WeeklyLists;
 
 namespace CadeAEscalacao.Application.Lists;
 
-/// <summary>Opens the list of a match date, with every regular of the group pending.</summary>
+/// <summary>The president opens the list of a match date, with every regular of the group pending.</summary>
 public sealed class OpenWeeklyList(
     IGroupRepository groups,
     IWeeklyListRepository lists,
     SeasonAttendance attendance,
+    ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
 {
     public async Task<WeeklyListResponse> HandleAsync(
@@ -18,6 +19,7 @@ public sealed class OpenWeeklyList(
     {
         var group = await groups.GetByIdAsync(groupId, cancellationToken)
             ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
         if (await lists.ExistsAsync(groupId, matchDate, cancellationToken))
         {
             throw new ConflictException("The group already has a list for this date.");

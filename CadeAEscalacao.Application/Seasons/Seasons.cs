@@ -13,7 +13,9 @@ public sealed record SeasonResponse(Guid Id, Guid GroupId, string Name, DateOnly
         new(season.Id.Value, season.GroupId.Value, season.Name, season.Start, season.End);
 }
 
-public sealed class CreateSeason(ISeasonRepository seasons, IGroupRepository groups, IUnitOfWork unitOfWork)
+/// <summary>Only the president creates seasons (ADR-016).</summary>
+public sealed class CreateSeason(
+    ISeasonRepository seasons, IGroupRepository groups, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<SeasonResponse> HandleAsync(
         GroupId groupId,
@@ -22,10 +24,9 @@ public sealed class CreateSeason(ISeasonRepository seasons, IGroupRepository gro
         int durationInMonths = Season.DefaultDurationInMonths,
         CancellationToken cancellationToken = default)
     {
-        if (!await groups.ExistsAsync(groupId, cancellationToken))
-        {
-            throw new NotFoundException("Group", groupId);
-        }
+        var group = await groups.GetByIdAsync(groupId, cancellationToken)
+            ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
 
         var season = Season.Create(groupId, name, start, durationInMonths);
 

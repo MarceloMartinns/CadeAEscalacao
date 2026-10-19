@@ -49,7 +49,7 @@ O projeto é construído em 12 etapas, da estrutura da solution ao deploy e uso 
 |---|---|
 | Backend | C# · ASP.NET Core (.NET 10 LTS) |
 | Frontend | React · TypeScript · Vite |
-| Banco / Auth | Supabase (PostgreSQL + Supabase Auth) |
+| Banco / Auth | Supabase (PostgreSQL) + login na própria API com ASP.NET Core Identity e JWT |
 | ORM | Entity Framework Core + Npgsql |
 | Testes | NUnit · Shouldly · Vitest · Playwright |
 | CI/CD | GitHub Actions |

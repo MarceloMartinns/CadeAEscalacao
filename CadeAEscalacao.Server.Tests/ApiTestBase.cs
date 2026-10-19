@@ -1,7 +1,10 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CadeAEscalacao.Domain.Players;
+using CadeAEscalacao.Server.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CadeAEscalacao.Server.Tests;
@@ -30,6 +33,24 @@ public abstract class ApiTestBase
     {
         Client.Dispose();
         Api.Dispose();
+    }
+
+    /// <summary>Simulates a signed-in person with a token made by the tests (see <see cref="TestTokens"/>).</summary>
+    protected void SignInAs(Guid? playerId = null, Guid? userId = null) =>
+        UseAccessToken(TestTokens.Create(playerId, userId));
+
+    protected void SignInAs(PlayerId playerId) => SignInAs(playerId.Value);
+
+    protected void UseAccessToken(string? accessToken) =>
+        Client.DefaultRequestHeaders.Authorization =
+            accessToken is null ? null : new AuthenticationHeaderValue("Bearer", accessToken);
+
+    /// <summary>The real login: asks for the code, reads it from the fake e-mail and checks it.</summary>
+    protected async Task<TokenResponse> LoginAsync(string email)
+    {
+        (await PostAsync("/api/auth/email/start", new { email })).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var response = await PostAsync("/api/auth/email/verify", new { email, code = Api.Emails.LastCodeSentTo(email) });
+        return await ReadAsync<TokenResponse>(response, HttpStatusCode.OK);
     }
 
     protected Task<HttpResponseMessage> PostAsync(string url, object? body = null) =>

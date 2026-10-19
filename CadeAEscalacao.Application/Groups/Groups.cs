@@ -6,7 +6,7 @@ using CadeAEscalacao.Domain.Players;
 namespace CadeAEscalacao.Application.Groups;
 
 // Minimal group registration (members, pairs and coach rotation), so the API can be used
-// before the screens (etapa 8). Who may do each action (the president) comes in etapa 7.
+// before the screens (etapa 8). Only the president changes the group; members can see it (ADR-016).
 
 public sealed record GroupResponse(
     Guid Id,
@@ -35,15 +35,14 @@ public sealed record GroupMemberResponse(Guid PlayerId, PlayerType Type);
 
 public sealed record PairResponse(Guid FirstPlayerId, Guid SecondPlayerId);
 
-public sealed class CreateGroup(IGroupRepository groups, IPlayerRepository players, IUnitOfWork unitOfWork)
+/// <summary>Creates a group. Whoever creates it becomes the president (ADR-017).</summary>
+public sealed class CreateGroup(
+    IGroupRepository groups, IPlayerRepository players, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<GroupResponse> HandleAsync(
-        string name,
-        MatchFormat format,
-        DayOfWeek matchDay,
-        PlayerId presidentId,
-        CancellationToken cancellationToken = default)
+        string name, MatchFormat format, DayOfWeek matchDay, CancellationToken cancellationToken = default)
     {
+        var presidentId = currentUser.PlayerId;
         if (!await players.ExistsAsync(presidentId, cancellationToken))
         {
             throw new NotFoundException("Player", presidentId);
@@ -56,20 +55,30 @@ public sealed class CreateGroup(IGroupRepository groups, IPlayerRepository playe
     }
 }
 
-public sealed class GetGroup(IGroupRepository groups)
+public sealed class GetGroup(IGroupRepository groups, ICurrentUser currentUser)
 {
-    /// <summary>The group, or null if not found.</summary>
-    public async Task<GroupResponse?> HandleAsync(GroupId id, CancellationToken cancellationToken = default) =>
-        await groups.GetByIdAsync(id, cancellationToken) is { } group ? GroupResponse.From(group) : null;
+    /// <summary>The group, or null if not found. Only members can see it.</summary>
+    public async Task<GroupResponse?> HandleAsync(GroupId id, CancellationToken cancellationToken = default)
+    {
+        if (await groups.GetByIdAsync(id, cancellationToken) is not { } group)
+        {
+            return null;
+        }
+
+        Roles.EnsureMember(group, currentUser.PlayerId);
+        return GroupResponse.From(group);
+    }
 }
 
-public sealed class AddGroupMember(IGroupRepository groups, IPlayerRepository players, IUnitOfWork unitOfWork)
+public sealed class AddGroupMember(
+    IGroupRepository groups, IPlayerRepository players, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<GroupResponse> HandleAsync(
         GroupId groupId, PlayerId playerId, PlayerType type, CancellationToken cancellationToken = default)
     {
         var group = await groups.GetByIdAsync(groupId, cancellationToken)
             ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
         if (!await players.ExistsAsync(playerId, cancellationToken))
         {
             throw new NotFoundException("Player", playerId);
@@ -81,13 +90,14 @@ public sealed class AddGroupMember(IGroupRepository groups, IPlayerRepository pl
     }
 }
 
-public sealed class CreatePair(IGroupRepository groups, IUnitOfWork unitOfWork)
+public sealed class CreatePair(IGroupRepository groups, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<GroupResponse> HandleAsync(
         GroupId groupId, PlayerId first, PlayerId second, CancellationToken cancellationToken = default)
     {
         var group = await groups.GetByIdAsync(groupId, cancellationToken)
             ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
 
         group.CreatePair(first, second);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -95,13 +105,14 @@ public sealed class CreatePair(IGroupRepository groups, IUnitOfWork unitOfWork)
     }
 }
 
-public sealed class ReorderCoachRotation(IGroupRepository groups, IUnitOfWork unitOfWork)
+public sealed class ReorderCoachRotation(IGroupRepository groups, ICurrentUser currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<GroupResponse> HandleAsync(
         GroupId groupId, IReadOnlyList<PlayerId> order, CancellationToken cancellationToken = default)
     {
         var group = await groups.GetByIdAsync(groupId, cancellationToken)
             ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsurePresident(group, currentUser.PlayerId);
 
         group.ReorderCoachRotation(order);
         await unitOfWork.SaveChangesAsync(cancellationToken);
