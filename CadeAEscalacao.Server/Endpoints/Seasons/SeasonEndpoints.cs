@@ -20,8 +20,16 @@ public static class SeasonEndpoints
             .WithSummary("Creates a season for the group (default: 6 months).")
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        app.MapGet("/groups/{groupId:guid}/seasons", ListAsync)
+            .WithTags("Seasons")
+            .WithSummary("Lists the seasons of the group, newest first.");
+
         return app;
     }
+
+    private static async Task<Ok<IReadOnlyList<SeasonResponse>>> ListAsync(
+        Guid groupId, ListGroupSeasons listSeasons, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await listSeasons.HandleAsync(new GroupId(groupId), cancellationToken));
 
     private static async Task<Created<SeasonResponse>> CreateAsync(
         Guid groupId, CreateSeasonRequest request, CreateSeason createSeason, CancellationToken cancellationToken)

@@ -2,6 +2,7 @@ using System.Net;
 using CadeAEscalacao.Application.Matches;
 using CadeAEscalacao.Application.Rankings;
 using CadeAEscalacao.Domain.Matches;
+using CadeAEscalacao.Domain.Players;
 using CadeAEscalacao.Domain.Seasons;
 using Microsoft.AspNetCore.Http;
 
@@ -144,6 +145,24 @@ public sealed class MatchAndRankingEndpointsTests : ApiTestBase
             .ShouldBe([_team.Substitute1.Value, _team.Regular.Value], ignoreOrder: true);
         ranking.Entries.Take(2).ShouldAllBe(entry => entry.Position == 1 && entry.Points == 3);
         ranking.Entries.Skip(2).ShouldAllBe(entry => entry.Position == 3 && entry.Points == 0);
+    }
+
+    [Test]
+    public async Task GetRanking_BringsTheGroupAndTheNameOfEachPlayer()
+    {
+        var season = SeasonWithOneMatch();
+        Api.Players.GetNamesAsync(Arg.Any<IReadOnlyCollection<PlayerId>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyDictionary<PlayerId, string>>(
+                new Dictionary<PlayerId, string> { [_team.Substitute1] = "Pedro", [_team.Regular] = "João" }));
+        SignInAs(_team.Substitute3);
+
+        var response = await Client.GetAsync($"/api/seasons/{season.Id}/ranking");
+
+        // The names come with the ranking: someone who left the group is still in it (ADR-021).
+        var ranking = await ReadAsync<SeasonRankingResponse>(response, HttpStatusCode.OK);
+        ranking.GroupId.ShouldBe(_team.Group.Id.Value);
+        ranking.Entries.Single(entry => entry.PlayerId == _team.Substitute1.Value).PlayerName.ShouldBe("Pedro");
+        ranking.Entries.Single(entry => entry.PlayerId == _team.Regular.Value).PlayerName.ShouldBe("João");
     }
 
     [Test]

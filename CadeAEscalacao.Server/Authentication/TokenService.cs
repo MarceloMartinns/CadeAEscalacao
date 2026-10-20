@@ -7,8 +7,11 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace CadeAEscalacao.Server.Authentication;
 
-/// <summary>Tokens returned by the login: <c>expiresIn</c> is the access token lifetime in seconds.</summary>
-public sealed record TokenResponse(string AccessToken, int ExpiresIn, string RefreshToken);
+/// <summary>
+/// Tokens returned by the login: <c>expiresIn</c> is the access token lifetime in seconds.
+/// <c>refreshToken</c> is null when it went to the cookie (<c>useCookie</c>, ADR-020).
+/// </summary>
+public sealed record TokenResponse(string AccessToken, int ExpiresIn, string? RefreshToken);
 
 /// <summary>A new access token, without a new refresh token (e.g. after the profile is created).</summary>
 public sealed record AccessTokenResponse(string AccessToken, int ExpiresIn);

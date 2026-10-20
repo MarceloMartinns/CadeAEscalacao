@@ -7,6 +7,7 @@
 
 ### 1a. Marcelo pede o código (o e-mail aparece no console da API)
 # Copie o código de 6 dígitos do console para @codeMarcelo, no topo do arquivo.
+# O e-mail também traz um link para a tela de login, que já preenche o código (ADR-022).
 # Para rodar o fluxo de novo do zero, troque @run (cada rodada usa e-mails novos).
 POST {{host}}/api/auth/email/start
 Content-Type: application/json
@@ -111,12 +112,12 @@ Content-Type: application/json
 
 { "playerId": "{{joao.response.body.$.player.id}}", "type": "Regular" }
 
-###
-POST {{host}}/api/groups/{{group.response.body.$.id}}/members
+### Também dá para adicionar pelo e-mail da conta (a pessoa já precisa ter criado o perfil)
+POST {{host}}/api/groups/{{group.response.body.$.id}}/members/by-email
 Authorization: Bearer {{marcelo.response.body.$.token.accessToken}}
 Content-Type: application/json
 
-{ "playerId": "{{pedro.response.body.$.player.id}}", "type": "Substitute" }
+{ "email": "pedro.{{run}}@example.com", "type": "Substitute" }
 
 ###
 POST {{host}}/api/groups/{{group.response.body.$.id}}/members
@@ -222,11 +223,24 @@ Content-Type: application/json
 GET {{host}}/api/seasons/{{season.response.body.$.id}}/ranking
 Authorization: Bearer {{lucas.response.body.$.token.accessToken}}
 
-### 20. Grupo: Marcelo foi para o fim do rodízio
+### 20. Grupo: Marcelo foi para o fim do rodízio (cada membro vem com o nome)
 GET {{host}}/api/groups/{{group.response.body.$.id}}
 Authorization: Bearer {{joao.response.body.$.token.accessToken}}
 
+### 20a. Os grupos do João
+GET {{host}}/api/groups
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
+
+### 20b. As listas do grupo, da mais recente para a mais antiga, com a escalação e a partida
+GET {{host}}/api/groups/{{group.response.body.$.id}}/lists
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
+
+### 20c. As temporadas do grupo
+GET {{host}}/api/groups/{{group.response.body.$.id}}/seasons
+Authorization: Bearer {{joao.response.body.$.token.accessToken}}
+
 ### 21. Renovar a sessão do Marcelo (o refresh token antigo deixa de valer)
+# Aqui o token vai no corpo. O navegador manda { "useCookie": true } e usa o cookie HttpOnly (ADR-020).
 # @name refreshMarcelo
 POST {{host}}/api/auth/refresh
 Content-Type: application/json

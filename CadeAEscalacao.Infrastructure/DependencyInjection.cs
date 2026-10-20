@@ -46,6 +46,7 @@ public static class DependencyInjection
 
         // Development only: writes the e-mail to the console. A real provider comes in etapa 10.
         services.AddSingleton<IEmailSender, ConsoleEmailSender>();
+        services.AddScoped<IAccountDirectory, AccountDirectory>();
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddScoped<IPlayerRepository, PlayerRepository>();

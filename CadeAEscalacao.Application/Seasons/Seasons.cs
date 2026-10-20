@@ -41,3 +41,20 @@ public sealed class CreateSeason(
         return SeasonResponse.From(season);
     }
 }
+
+/// <summary>The group's seasons, newest first, to reach the ranking (ADR-021). Only members can see them.</summary>
+public sealed class ListGroupSeasons(ISeasonRepository seasons, IGroupRepository groups, ICurrentUser currentUser)
+{
+    public async Task<IReadOnlyList<SeasonResponse>> HandleAsync(
+        GroupId groupId, CancellationToken cancellationToken = default)
+    {
+        var group = await groups.GetByIdAsync(groupId, cancellationToken)
+            ?? throw new NotFoundException("Group", groupId);
+        Roles.EnsureMember(group, currentUser.PlayerId);
+
+        return (await seasons.ListByGroupAsync(groupId, cancellationToken))
+            .OrderByDescending(season => season.Start)
+            .Select(SeasonResponse.From)
+            .ToList();
+    }
+}

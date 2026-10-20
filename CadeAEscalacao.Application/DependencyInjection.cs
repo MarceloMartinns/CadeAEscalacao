@@ -21,15 +21,19 @@ public static class DependencyInjection
         services.AddScoped<GetPlayer>();
 
         services.AddScoped<CreateGroup>();
+        services.AddScoped<ListMyGroups>();
         services.AddScoped<GetGroup>();
         services.AddScoped<AddGroupMember>();
+        services.AddScoped<AddGroupMemberByEmail>();
         services.AddScoped<CreatePair>();
         services.AddScoped<ReorderCoachRotation>();
 
         services.AddScoped<CreateSeason>();
+        services.AddScoped<ListGroupSeasons>();
 
         services.AddScoped<OpenWeeklyList>();
         services.AddScoped<GetWeeklyList>();
+        services.AddScoped<ListGroupLists>();
         services.AddScoped<ChangeWeeklyList>();
         services.AddScoped<SignUpForList>();
         services.AddScoped<WithdrawFromList>();

@@ -59,6 +59,7 @@ public static class AuthenticationSetup
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<TokenService>();
+        services.AddSingleton<RefreshTokenCookie>();
 
         services.AddRateLimiter(options =>
         {

@@ -464,6 +464,145 @@ Até a etapa 6, quem agia era identificado por um `playerId` na rota ou no corpo
 
 ---
 
+## ADR-018 — Front-end: React Router, TanStack Query, Mantine e pastas por funcionalidade
+
+**Status:** Aceita · **Data:** 2026-10-19
+
+**Contexto**
+A etapa 8 transforma o template do Visual Studio (ADR-002) nas telas da pelada. O grupo usa o app no celular, o desenvolvedor está aprendendo React e o objetivo de estudo inclui roteamento, chamadas à API e layout mobile-first. As telas são, na maior parte, listas, formulários curtos e botões de ação.
+
+**Decisão**
+- **Roteamento:** React Router (v8) no modo biblioteca (`createBrowserRouter`), com as rotas `/login`, `/perfil`, `/grupos`, `/grupos/novo`, `/grupos/:groupId`, `/grupos/:groupId/membros`, `/listas/:listId`, `/escalacoes/:lineupId`, `/partidas/:matchId` e `/temporadas/:seasonId/ranking`. A API já devolve o `index.html` para qualquer rota desconhecida (`MapFallbackToFile`).
+- **Estado do servidor:** TanStack Query (cache, carregamento, erros e invalidação depois de cada ação). Não há biblioteca de estado global: o que vem da API fica no TanStack Query, e o resto é estado local dos componentes.
+- **Componentes e CSS:** Mantine, que já traz os componentes que as telas usam (`PinInput` para o código, `Chip` para as posições, `SegmentedControl`, `AppShell`, notificações) e funciona bem no celular.
+- **Pastas por funcionalidade** (como os *vertical slices* da ADR-001):
+  - `src/app` — rotas, providers e layout;
+  - `src/api` — cliente HTTP, tipos gerados (ADR-019) e sessão (ADR-020);
+  - `src/features/{auth,groups,lists,lineups,matches,rankings}` — telas e hooks de cada funcionalidade;
+  - `src/components` — componentes compartilhados.
+- **Testes** com Vitest, React Testing Library, `user-event` e jsdom (ADR-004), ao lado do arquivo testado (`*.test.tsx`). A API é simulada com **MSW** (Mock Service Worker), que intercepta as requisições HTTP: o teste exercita o mesmo cliente que a tela usa.
+- **Idioma:** textos da tela em português, código em inglês (ADR-009). A tradução dos valores da API (ex.: `Goalkeeper` → "Goleiro") fica num único arquivo. Datas no formato brasileiro.
+
+**Alternativas**
+- TanStack Router — rotas com tipos mais fortes, mas menos difundido; React Router é o mais usado e o previsto no roteiro.
+- `fetch` + `useEffect` sem biblioteca — menos dependências, mas cada tela repetiria carregamento, erro e recarga dos dados.
+- Tailwind CSS + shadcn/ui — mais flexível e muito usado, mas exige aprender Tailwind junto com React; pode ser reavaliado depois.
+- Mocks do cliente HTTP com `vi.mock` — mais simples, mas não testa o cliente de verdade.
+
+**Consequências**
+- ✅ Cada funcionalidade fica numa pasta só, do hook à tela e ao teste.
+- ✅ Componentes prontos para celular, sem escrever CSS do zero.
+- ⚠️ Mais dependências no `package.json` (React Router, TanStack Query, Mantine, MSW).
+- ⚠️ O visual fica com a cara do Mantine; personalizar além do tema dá trabalho.
+
+---
+
+## ADR-019 — Tipos e cliente da API gerados a partir do OpenAPI
+
+**Status:** Aceita · **Data:** 2026-10-19
+
+**Contexto**
+O React precisa dos formatos de requisição e resposta da API. A API já descreve tudo no documento OpenAPI (ADR-013), com os enums como texto. Tipos escritos à mão ficariam desatualizados a cada mudança na API.
+
+**Decisão**
+- O `dotnet build` do Server grava o documento OpenAPI num arquivo, com o pacote `Microsoft.Extensions.ApiDescription.Server`. Assim não é preciso subir a API para gerar os tipos.
+- O comando `npm run gen:api` usa o **`openapi-typescript`** para gerar `src/api/schema.d.ts` a partir desse arquivo. O arquivo gerado vai para o Git, para o `npm run build` funcionar sem o .NET.
+- As chamadas usam o **`openapi-fetch`**, que confere a rota, os parâmetros e o corpo pelos tipos gerados. A sessão (ADR-020) entra na função `fetch` do cliente (`src/api/client.ts`), que põe o token e renova a sessão no 401.
+- Quando a API mudar: `dotnet build` → `npm run gen:api` → o `tsc` aponta o que as telas precisam ajustar.
+
+**Alternativas**
+- Tipos escritos à mão — nenhuma ferramenta a mais, mas ficam desatualizados sem aviso.
+- Gerador de cliente completo (NSwag, Orval, Kiota) — gera muito código e, no caso do Orval, os hooks do TanStack Query; é mais difícil de entender ao estudar.
+
+**Consequências**
+- ✅ Mudança na API vira erro de compilação no front, não erro em produção.
+- ⚠️ É preciso lembrar de rodar `npm run gen:api` depois de mudar a API (a CI da etapa 9 pode conferir isso).
+- ⚠️ Os tipos refletem o OpenAPI: se um endpoint não declarar uma resposta, o tipo também não terá. A posição (`Position`) é um enum de flags e aparece só como texto; o front define os valores dela à mão, em `src/app/labels.ts`.
+- ⚠️ Para os números virem como `number` (e não `number | string`), a API passou a aceitar números só como números (`JsonNumberHandling.Strict`).
+- ⚠️ O `openapi-typescript` 7 declara compatibilidade só com o TypeScript 5. O `package.json` tem um `overrides` que o faz usar o TypeScript 6 do projeto; rever quando sair uma versão nova.
+- ⚠️ Durante o build, o `Program.cs` roda só para gravar o documento, sem User Secrets: ele usa valores provisórios para a connection string e a chave quando quem roda é a ferramenta `GetDocument.Insider`.
+
+---
+
+## ADR-020 — Sessão no navegador: access token em memória e refresh token em cookie HttpOnly
+
+**Status:** Aceita · **Data:** 2026-10-19 · Completa a ADR-015
+
+**Contexto**
+A ADR-015 deixou para a etapa 8 onde o React guarda os tokens. Um token no `localStorage` pode ser lido por qualquer script que rode na página (XSS). O app e a API ficam na mesma origem (ADR-002).
+
+**Decisão**
+- **Access token só em memória** (uma variável do módulo de sessão). Ao fechar ou recarregar a página, ele se perde.
+- **Refresh token em cookie** `HttpOnly`, `Secure`, `SameSite=Strict`, com `Path=/api/auth`: o JavaScript não lê o cookie, e o navegador só o envia para os endpoints de login.
+- O React envia `"useCookie": true` em `email/verify` e `refresh`: a API grava o refresh token no cookie e devolve `refreshToken: null` no corpo, para que o JavaScript nunca o veja. Sem esse campo, tudo funciona como antes (token no corpo), o que mantém o `.http` e os testes.
+- `refresh` e `logout` leem o token do corpo **ou**, se o corpo não trouxer, do cookie. O `logout` e um `refresh` recusado apagam o cookie.
+- **Ao abrir o app**, o React chama `POST /api/auth/refresh`: se o cookie for válido, a sessão volta sem novo login.
+- **Renovação no 401:** a função `fetch` do cliente (ADR-019) chama `/api/auth/refresh` e repete a requisição uma vez. Se várias requisições falharem juntas, todas esperam o **mesmo** refresh (o refresh token é rotativo, e usá-lo duas vezes revogaria a sessão, ADR-015). Se o refresh falhar, a sessão é limpa e a tela vai para `/login`.
+
+**Alternativas**
+- Os dois tokens no `localStorage` — mais simples, mas um XSS leva a sessão de 30 dias.
+- Cookie de autenticação do Identity em vez de JWT — o mais seguro, mas exige proteção contra CSRF em todos os endpoints e mudaria a ADR-015.
+- Access token no `sessionStorage` — sobrevive ao recarregar, mas tem o mesmo risco de XSS; o refresh na abertura já resolve.
+
+**Consequências**
+- ✅ Um script malicioso só consegue o access token, que vale no máximo 30 minutos.
+- ✅ Sem CSRF: o cookie só vai para `/api/auth`, só na mesma origem (`SameSite=Strict`), e esses endpoints não fazem nada em nome da pessoa além de renovar ou encerrar a sessão.
+- ⚠️ Cada abertura do app faz um refresh antes da primeira tela.
+- ⚠️ O cookie `Secure` exige HTTPS; em desenvolvimento o Vite já serve em HTTPS (`https://localhost:49409`).
+
+---
+
+## ADR-021 — Endpoints de consulta para as telas
+
+**Status:** Aceita · **Data:** 2026-10-19
+
+**Contexto**
+Até a etapa 7 a API só tinha leitura por id, e as respostas traziam apenas ids de jogadores. Com isso, o React não tem como descobrir os grupos da pessoa, a lista da semana, a escalação e a temporada, nem mostrar nomes. Para adicionar um membro, o presidente precisaria saber o id do jogador.
+
+**Decisão**
+- `GET /api/groups` — os grupos de que a pessoa logada é membro.
+- `GroupResponse` passa a trazer o **nome** de cada membro. As outras telas traduzem id → nome com o grupo, que o TanStack Query guarda em cache (ADR-018), em vez de repetir nomes em todas as respostas.
+- `GET /api/groups/{id}/lists` — as 20 listas mais recentes do grupo (cerca de cinco meses de jogos semanais), da mais recente para a mais antiga, cada uma com o `lineupId`, o status da escalação e o `matchId` quando já existirem. É o ponto de partida da tela do grupo. Paginação fica para quando fizer falta.
+- `GET /api/groups/{id}/seasons` — as temporadas do grupo, para chegar ao ranking.
+- **Exceção: o ranking traz o `groupId` e o nome de cada jogador.** Quem saiu do grupo deixa de estar entre os membros, mas continua no ranking da temporada; sem o nome na resposta, ele apareceria sem nome.
+- `POST /api/groups/{id}/members/by-email` — o presidente adiciona por e-mail quem já se cadastrou (`POST /api/me`). A busca do e-mail fica atrás de uma abstração na Application, implementada no Infrastructure com o Identity (ADR-014). E-mail sem cadastro → 404 (só o presidente chega até aqui). Convite para quem ainda não tem conta continua para depois.
+- Todas as regras de visibilidade continuam as da ADR-016: só membros veem o grupo, as listas e as temporadas.
+- As telas do presidente cobrem o mínimo para o fluxo no celular: criar grupo, membros, duplas, temporada, abrir/fechar/cancelar a lista e iniciar a escalação. Reordenar o rodízio e corrigir o placar continuam só pela API (`.http`).
+
+**Alternativas**
+- Nomes em todas as respostas (lista, escalação, partida, ranking) — menos trabalho no front, mas mais consultas e respostas maiores na API.
+- Um endpoint "painel" com tudo da semana — menos requisições, mas acopla a API ao desenho de uma tela.
+- Buscar jogador por nome — nomes se repetem; o e-mail é único.
+
+**Consequências**
+- ✅ As telas navegam só com o que a API devolve.
+- ⚠️ Adicionar por e-mail revela ao presidente se aquele e-mail tem conta; aceito, porque só o presidente do grupo chega a esse endpoint.
+
+---
+
+## ADR-022 — Link de login no e-mail
+
+**Status:** Aceita · **Data:** 2026-10-19
+
+**Contexto**
+A ADR-014 previu que, a partir da etapa 8, o e-mail traria um link que já preenche o código.
+
+**Decisão**
+- O e-mail traz o código de 6 dígitos **e** um link `{App:PublicUrl}/login#email=…&code=…`.
+- O código vai no **fragmento** (`#`): o navegador não envia o fragmento ao servidor, então ele não aparece em logs de servidor ou proxy. A tela de login lê o fragmento, preenche os campos, envia o código e limpa o endereço.
+- `App:PublicUrl` é configuração: em desenvolvimento, `https://localhost:49409` (Vite); em produção, o endereço do app (etapa 10).
+- O código digitado continua valendo para quem abre o e-mail em outro aparelho.
+
+**Alternativas**
+- Código na query string (`?code=`) — mais comum, mas vai para os logs.
+- Link com token próprio, diferente do código — mais um tipo de token para guardar e validar, sem ganho.
+
+**Consequências**
+- ✅ Um toque no e-mail faz o login no mesmo celular.
+- ⚠️ O link vale só enquanto o código vale (poucos minutos) e conta como tentativa no bloqueio da ADR-014.
+
+---
+
 ## Modelo
 
 ```markdown
