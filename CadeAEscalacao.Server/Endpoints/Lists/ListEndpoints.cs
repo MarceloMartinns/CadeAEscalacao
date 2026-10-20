@@ -26,6 +26,9 @@ public static class ListEndpoints
             .WithTags("Lists")
             .WithSummary("Opens the list of a match date, with every regular pending.")
             .ProducesProblem(StatusCodes.Status409Conflict);
+        app.MapGet("/groups/{groupId:guid}/lists", ListByGroupAsync)
+            .WithTags("Lists")
+            .WithSummary("Lists the group's most recent lists, with their lineup and match.");
 
         var lists = app.MapGroup("/lists")
             .WithTags("Lists")
@@ -50,6 +53,10 @@ public static class ListEndpoints
         var list = await openList.HandleAsync(new GroupId(groupId), request.MatchDate!.Value, cancellationToken);
         return TypedResults.Created($"/api/lists/{list.Id}", list);
     }
+
+    private static async Task<Ok<IReadOnlyList<WeeklyListSummaryResponse>>> ListByGroupAsync(
+        Guid groupId, ListGroupLists listLists, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await listLists.HandleAsync(new GroupId(groupId), cancellationToken));
 
     private static async Task<Results<Ok<WeeklyListResponse>, NotFound>> GetAsync(
         Guid id, GetWeeklyList getList, CancellationToken cancellationToken) =>

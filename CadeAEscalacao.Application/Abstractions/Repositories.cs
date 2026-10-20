@@ -16,6 +16,10 @@ public interface IPlayerRepository
 
     Task<bool> ExistsAsync(PlayerId id, CancellationToken cancellationToken = default);
 
+    /// <summary>The name of each player found, by ID.</summary>
+    Task<IReadOnlyDictionary<PlayerId, string>> GetNamesAsync(
+        IReadOnlyCollection<PlayerId> ids, CancellationToken cancellationToken = default);
+
     void Add(Player player);
 }
 
@@ -24,6 +28,9 @@ public interface IGroupRepository
     Task<Group?> GetByIdAsync(GroupId id, CancellationToken cancellationToken = default);
 
     Task<bool> ExistsAsync(GroupId id, CancellationToken cancellationToken = default);
+
+    /// <summary>The groups that have the player as a member.</summary>
+    Task<IReadOnlyList<Group>> ListByMemberAsync(PlayerId playerId, CancellationToken cancellationToken = default);
 
     void Add(Group group);
 }
@@ -34,6 +41,10 @@ public interface IWeeklyListRepository
 
     Task<bool> ExistsAsync(GroupId groupId, DateOnly matchDate, CancellationToken cancellationToken = default);
 
+    /// <summary>The group's most recent lists, newest match date first.</summary>
+    Task<IReadOnlyList<WeeklyList>> ListRecentByGroupAsync(
+        GroupId groupId, int count, CancellationToken cancellationToken = default);
+
     void Add(WeeklyList list);
 }
 
@@ -43,6 +54,9 @@ public interface ILineupRepository
 
     Task<bool> ExistsForListAsync(WeeklyListId weeklyListId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Lineup>> ListByWeeklyListsAsync(
+        IReadOnlyCollection<WeeklyListId> weeklyListIds, CancellationToken cancellationToken = default);
+
     void Add(Lineup lineup);
 }
 
@@ -51,6 +65,9 @@ public interface IMatchRepository
     Task<Match?> GetByIdAsync(MatchId id, CancellationToken cancellationToken = default);
 
     Task<bool> ExistsForLineupAsync(LineupId lineupId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Match>> ListByLineupsAsync(
+        IReadOnlyCollection<LineupId> lineupIds, CancellationToken cancellationToken = default);
 
     /// <summary>Matches of the group played between <paramref name="from"/> and <paramref name="to"/> (inclusive).</summary>
     Task<IReadOnlyList<Match>> ListByGroupAsync(
@@ -68,6 +85,8 @@ public interface ISeasonRepository
 
     /// <summary>True if the group has a season that shares at least one day with the period.</summary>
     Task<bool> OverlapsAsync(GroupId groupId, DateOnly start, DateOnly end, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Season>> ListByGroupAsync(GroupId groupId, CancellationToken cancellationToken = default);
 
     void Add(Season season);
 }

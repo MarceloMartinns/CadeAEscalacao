@@ -14,6 +14,9 @@ public sealed record CreateGroupRequest(
 
 public sealed record AddMemberRequest(Guid PlayerId, [EnumDataType(typeof(PlayerType))] PlayerType Type);
 
+public sealed record AddMemberByEmailRequest(
+    [Required, EmailAddress, StringLength(256)] string Email, [EnumDataType(typeof(PlayerType))] PlayerType Type);
+
 public sealed record CreatePairRequest(Guid FirstPlayerId, Guid SecondPlayerId);
 
 public sealed record ReorderCoachRotationRequest([Required] IReadOnlyList<Guid> PlayerIds);
@@ -27,8 +30,11 @@ public static class GroupEndpoints
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         groups.MapPost("/", CreateAsync).WithSummary("Creates a group. The signed-in player is the president and its first regular member.");
+        groups.MapGet("/", ListMineAsync).WithSummary("Lists the groups of the signed-in player.");
         groups.MapGet("/{id:guid}", GetAsync).WithSummary("Gets a group with its members, pairs and coach rotation.");
         groups.MapPost("/{id:guid}/members", AddMemberAsync).WithSummary("Adds a regular or substitute member.");
+        groups.MapPost("/{id:guid}/members/by-email", AddMemberByEmailAsync)
+            .WithSummary("Adds a member by the e-mail of their account. The person must have created their profile.");
         groups.MapPost("/{id:guid}/pairs", CreatePairAsync).WithSummary("Creates a pair of members.");
         groups.MapPut("/{id:guid}/coach-rotation", ReorderCoachRotationAsync)
             .WithSummary("Sets the coach order. It must list every regular member exactly once.");
@@ -47,6 +53,10 @@ public static class GroupEndpoints
         return TypedResults.Created($"/api/groups/{group.Id}", group);
     }
 
+    private static async Task<Ok<IReadOnlyList<GroupSummaryResponse>>> ListMineAsync(
+        ListMyGroups listMyGroups, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await listMyGroups.HandleAsync(cancellationToken));
+
     private static async Task<Results<Ok<GroupResponse>, NotFound>> GetAsync(
         Guid id, GetGroup getGroup, CancellationToken cancellationToken) =>
         await getGroup.HandleAsync(new GroupId(id), cancellationToken) is { } group
@@ -57,6 +67,10 @@ public static class GroupEndpoints
         Guid id, AddMemberRequest request, AddGroupMember addMember, CancellationToken cancellationToken) =>
         TypedResults.Ok(await addMember.HandleAsync(
             new GroupId(id), new PlayerId(request.PlayerId), request.Type, cancellationToken));
+
+    private static async Task<Ok<GroupResponse>> AddMemberByEmailAsync(
+        Guid id, AddMemberByEmailRequest request, AddGroupMemberByEmail addMember, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await addMember.HandleAsync(new GroupId(id), request.Email, request.Type, cancellationToken));
 
     private static async Task<Ok<GroupResponse>> CreatePairAsync(
         Guid id, CreatePairRequest request, CreatePair createPair, CancellationToken cancellationToken) =>

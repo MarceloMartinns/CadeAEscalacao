@@ -40,6 +40,9 @@ public sealed class RegistrationEndpointsTests : ApiTestBase
     {
         var presidentId = Guid.NewGuid();
         Api.Players.ExistsAsync(new PlayerId(presidentId), Arg.Any<CancellationToken>()).Returns(true);
+        Api.Players.GetNamesAsync(Arg.Any<IReadOnlyCollection<PlayerId>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyDictionary<PlayerId, string>>(
+                new Dictionary<PlayerId, string> { [new PlayerId(presidentId)] = "Marcelo" }));
         SignInAs(presidentId);
 
         var response = await PostAsync("/api/groups", new
@@ -53,7 +56,7 @@ public sealed class RegistrationEndpointsTests : ApiTestBase
         var group = await ReadAsync<GroupResponse>(response, HttpStatusCode.Created);
         group.PresidentId.ShouldBe(presidentId);
         group.MatchDay.ShouldBe(DayOfWeek.Tuesday);
-        group.Members.ShouldBe([new GroupMemberResponse(presidentId, PlayerType.Regular)]);
+        group.Members.ShouldBe([new GroupMemberResponse(presidentId, "Marcelo", PlayerType.Regular)]);
         group.CoachRotation.ShouldBe([presidentId]);
     }
 
@@ -189,5 +192,7 @@ public sealed class RegistrationEndpointsTests : ApiTestBase
         document.ShouldContain("/api/lists/{id}/entries/me");
         document.ShouldContain("/api/lineups/{id}/choice");
         document.ShouldContain("/api/seasons/{seasonId}/ranking");
+        document.ShouldContain("/api/groups/{groupId}/lists");
+        document.ShouldContain("/api/groups/{id}/members/by-email");
     }
 }
