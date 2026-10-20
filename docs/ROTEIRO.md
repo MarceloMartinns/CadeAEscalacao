@@ -16,8 +16,8 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 | 4 | Modelagem do domínio | ✅ |
 | 5 | Banco de dados | ✅ |
 | 6 | API | ✅ |
-| 7 | Autenticação e papéis | 🚧 |
-| 8 | Telas em React | ⬜ |
+| 7 | Autenticação e papéis | ✅ |
+| 8 | Telas em React | 🚧 |
 | 9 | CI com GitHub Actions | ⬜ |
 | 10 | Docker e deploy | ⬜ |
 | 11 | IA no desenvolvimento | ⬜ |
@@ -94,7 +94,7 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** ASP.NET Core, injeção de dependência, vertical slices, testes de API.
 
-## 7. Autenticação e papéis 🚧
+## 7. Autenticação e papéis ✅
 **Objetivo:** cada pessoa entra com sua conta e só faz o que o papel permite (ADR-014 a ADR-017).
 
 - [x] Decidir: Supabase Auth ou login na própria API → login na API com ASP.NET Core Identity, sem senha (ADR-014)
@@ -108,17 +108,17 @@ Plano de construção do **Cadê a escalação?**, dividido em etapas. Cada etap
 
 **Estudo:** ASP.NET Core Identity, JWT, refresh token, OAuth, autorização baseada em políticas, rate limiting.
 
-## 8. Telas em React ⬜
+## 8. Telas em React 🚧
 **Objetivo:** interface usável no celular, que é onde o grupo vive.
 
-- [ ] Login (código por e-mail, com link que já preenche o código)
-- [ ] Login com Google (cliente OAuth no Google Cloud Console)
-- [ ] Lista semanal (confirmar/sair/suplente)
-- [ ] Tela de escalação do professor (filtro por posição)
-- [ ] Escolha de time pela dupla
-- [ ] Registro de resultado
-- [ ] Ranking da temporada
-- [ ] Testes com Vitest + React Testing Library
+- [x] Login (código por e-mail, com link que já preenche o código) e sessão com refresh token em cookie HttpOnly (ADR-020, ADR-022)
+- [ ] Login com Google — adiado: exige um cliente OAuth no Google Cloud Console (ADR-014)
+- [x] Lista semanal (confirmar/sair/suplente)
+- [x] Tela de escalação do professor (filtro por posição)
+- [x] Escolha de time pela dupla (e dupla do dia escolhida pelo presidente)
+- [x] Registro de resultado (professor da vez ou presidente)
+- [x] Ranking da temporada
+- [x] Testes com Vitest + React Testing Library (API simulada com MSW)
 
 **Estudo:** React Router, gerenciamento de estado e chamadas à API, layout mobile-first.
 
