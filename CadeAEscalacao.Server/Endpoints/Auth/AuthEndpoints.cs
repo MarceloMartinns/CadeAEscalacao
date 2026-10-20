@@ -9,17 +9,24 @@ namespace CadeAEscalacao.Server.Endpoints.Auth;
 
 public sealed record StartEmailLoginRequest([Required, EmailAddress, StringLength(256)] string Email);
 
+/// <param name="UseCookie">The browser sends true: the refresh token goes to an HttpOnly cookie, not to the body (ADR-020).</param>
 public sealed record VerifyEmailLoginRequest(
     [Required, EmailAddress, StringLength(256)] string Email,
-    [Required, RegularExpression("^[0-9]{6}$")] string Code);
+    [Required, RegularExpression("^[0-9]{6}$")] string Code,
+    bool UseCookie = false);
 
-public sealed record RefreshTokenRequest([Required] string RefreshToken);
+/// <param name="RefreshToken">Read from the cookie when empty (ADR-020).</param>
+/// <param name="UseCookie">The browser sends true: the new refresh token goes to the cookie, not to the body.</param>
+public sealed record RefreshTokenRequest(string? RefreshToken = null, bool UseCookie = false);
 
 /// <summary>Passwordless login with a code sent by e-mail (ADR-014) and the session tokens (ADR-015).</summary>
 public static class AuthEndpoints
 {
     /// <summary>Purpose of the e-mail code: a code made for something else does not work here.</summary>
     private const string LoginPurpose = "login";
+
+    /// <summary>Address of the app, used in the login link (ADR-022). Without it, the e-mail has only the code.</summary>
+    public const string PublicUrlSetting = "App:PublicUrl";
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
@@ -45,6 +52,7 @@ public static class AuthEndpoints
         StartEmailLoginRequest request,
         UserManager<AppUser> users,
         IEmailSender emailSender,
+        IConfiguration configuration,
         CancellationToken cancellationToken)
     {
         var email = request.Email.Trim();
@@ -65,17 +73,35 @@ public static class AuthEndpoints
             await emailSender.SendAsync(
                 user.Email!,
                 "Seu código de acesso ao Cadê a escalação?",
-                $"Seu código é {code}. Ele vale por poucos minutos. Se não foi você que pediu, ignore este e-mail.",
+                LoginEmailBody(code, user.Email!, configuration[PublicUrlSetting]),
                 cancellationToken);
         }
 
         return TypedResults.Accepted((string?)null);
     }
 
+    /// <summary>
+    /// The code first, then a link that fills it in. The code goes in the fragment (#), which the
+    /// browser does not send to any server, so it stays out of the logs (ADR-022).
+    /// </summary>
+    private static string LoginEmailBody(string code, string email, string? publicUrl)
+    {
+        var body = $"Seu código é {code}. Ele vale por poucos minutos. Se não foi você que pediu, ignore este e-mail.";
+        if (string.IsNullOrWhiteSpace(publicUrl))
+        {
+            return body;
+        }
+
+        var link = $"{publicUrl.TrimEnd('/')}/login#email={Uri.EscapeDataString(email)}&code={code}";
+        return $"{body}\n\nOu toque no link para entrar: {link}";
+    }
+
     private static async Task<Results<Ok<TokenResponse>, ProblemHttpResult>> VerifyAsync(
         VerifyEmailLoginRequest request,
         UserManager<AppUser> users,
         TokenService tokens,
+        RefreshTokenCookie cookie,
+        HttpContext context,
         CancellationToken cancellationToken)
     {
         var user = await users.FindByEmailAsync(request.Email.Trim());
@@ -97,23 +123,52 @@ public static class AuthEndpoints
         // A new security stamp invalidates the code, so it cannot be used twice. Also saves EmailConfirmed.
         await users.UpdateSecurityStampAsync(user);
 
-        return TypedResults.Ok(await tokens.IssueAsync(user, cancellationToken));
+        var response = await tokens.IssueAsync(user, cancellationToken);
+        return TypedResults.Ok(request.UseCookie ? MoveToCookie(response, cookie, context) : response);
     }
 
     private static async Task<Results<Ok<TokenResponse>, ProblemHttpResult>> RefreshAsync(
-        RefreshTokenRequest request, TokenService tokens, CancellationToken cancellationToken) =>
-        await tokens.RefreshAsync(request.RefreshToken, cancellationToken) is { } response
-            ? TypedResults.Ok(response)
-            : TypedResults.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Invalid refresh token",
-                detail: "The refresh token is invalid, expired or revoked. Sign in again.");
+        RefreshTokenRequest request,
+        TokenService tokens,
+        RefreshTokenCookie cookie,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        var refreshToken = string.IsNullOrEmpty(request.RefreshToken) ? cookie.Read(context) : request.RefreshToken;
+        if (refreshToken is not null && await tokens.RefreshAsync(refreshToken, cancellationToken) is { } response)
+        {
+            return TypedResults.Ok(request.UseCookie ? MoveToCookie(response, cookie, context) : response);
+        }
+
+        cookie.Delete(context);
+        return TypedResults.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "Invalid refresh token",
+            detail: "The refresh token is invalid, expired or revoked. Sign in again.");
+    }
 
     private static async Task<NoContent> LogoutAsync(
-        RefreshTokenRequest request, TokenService tokens, CancellationToken cancellationToken)
+        RefreshTokenRequest request,
+        TokenService tokens,
+        RefreshTokenCookie cookie,
+        HttpContext context,
+        CancellationToken cancellationToken)
     {
-        await tokens.RevokeAsync(request.RefreshToken, cancellationToken);
+        var refreshToken = string.IsNullOrEmpty(request.RefreshToken) ? cookie.Read(context) : request.RefreshToken;
+        if (refreshToken is not null)
+        {
+            await tokens.RevokeAsync(refreshToken, cancellationToken);
+        }
+
+        cookie.Delete(context);
         return TypedResults.NoContent();
+    }
+
+    /// <summary>The browser keeps the refresh token in the HttpOnly cookie only, never in JavaScript (ADR-020).</summary>
+    private static TokenResponse MoveToCookie(TokenResponse response, RefreshTokenCookie cookie, HttpContext context)
+    {
+        cookie.Write(context, response.RefreshToken!);
+        return response with { RefreshToken = null };
     }
 
     // Same answer for an unknown e-mail, a wrong or expired code and a locked account,
